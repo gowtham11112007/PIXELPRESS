@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, Search, User, ShoppingCart } from 'lucide-react';
+import { ShoppingBag, User, ShoppingCart } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppContext } from '../context/AppContext';
@@ -37,8 +37,8 @@ export default function Navbar() {
 
   const totalCartCount = cart.reduce((total, item) => total + item.quantity, 0);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -100,7 +100,15 @@ export default function Navbar() {
                     className="flex items-center space-x-1.5 text-xs font-semibold text-gray-800 hover:text-black bg-gray-100 hover:bg-gray-200 px-2.5 py-1.5 rounded-sm transition-colors"
                     title={`Logged in as ${user.name} (${user.phone})`}
                   >
-                    <User className="w-3.5 h-3.5" />
+                    {user.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="w-4 h-4 rounded-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-3.5 h-3.5" />
+                    )}
                     <span>{user.name.split(' ')[0]}</span>
                   </Link>
                   <button

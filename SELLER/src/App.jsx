@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Orders from './pages/Orders';
+import Settings from './pages/Settings';
 import Toast from './components/Toast';
 
 const Layout = ({ children }) => {
@@ -27,6 +28,7 @@ const AppRoutes = () => {
         <Route path="/" element={<Layout><Dashboard /></Layout>} />
         <Route path="/products" element={<Layout><Products /></Layout>} />
         <Route path="/orders" element={<Layout><Orders /></Layout>} />
+        <Route path="/settings" element={<Layout><Settings /></Layout>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>

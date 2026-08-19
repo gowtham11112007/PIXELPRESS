@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search } from 'lucide-react';
+import { Search, Sparkles } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import ProductCard from '../components/ProductCard';
 import OrderModal from '../components/OrderModal';
@@ -8,34 +8,34 @@ import { collections } from '../data/mockProducts';
 import { useAppContext } from '../context/AppContext';
 
 // Scrolling promo bar below hero
-function PromoBar() {
-  const items = [
-    "✦ FREE DELIVERY FOR PREPAID ORDERS",
-    "✦ BUY 4 GET 3 FREE",
-    "✦ BUY 5 GET 5 FREE",
-    "✦ SPLIT POSTERS BUY 1 GET 2 FREE",
-    "✦ POSTER KIT BUY 2 GET 1 FREE",
-  ];
-  const text = items.join("     ");
+function PromoBar({ text }) {
+  const defaultText = "✦ FREE DELIVERY FOR PREPAID ORDERS ✦ SPLIT POSTERS ✦ CUSTOM WALL ART ✦ 100% QUALITY GUARANTEE";
+  const displayText = (text || defaultText) + "      ";
   return (
     <div className="bg-black text-white text-[11px] tracking-widest font-medium overflow-hidden py-2.5">
       <div className="marquee-track whitespace-nowrap select-none flex">
-        <span className="px-6">{text}</span>
-        <span className="px-6">{text}</span>
-        <span className="px-6">{text}</span>
-        <span className="px-6">{text}</span>
+        <span className="px-6">{displayText}</span>
+        <span className="px-6">{displayText}</span>
+        <span className="px-6">{displayText}</span>
+        <span className="px-6">{displayText}</span>
       </div>
     </div>
   );
 }
 
-const CATEGORIES = ["All", "Wall Setups", "Split Posters", "Motivation", "Cars & Motors", "Minimal"];
-
 export default function Home() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeCategory, setActiveCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const { products } = useAppContext();
+  const { products, isProductsLoading, storeSettings } = useAppContext();
+
+  // Dynamically compute category pills based on available products
+  const categories = useMemo(() => {
+    const defaultCats = ["All", "Wall Setups", "Split Posters", "Motivation", "Cars & Motors", "Minimal"];
+    const productCats = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+    const merged = Array.from(new Set([...defaultCats, ...productCats]));
+    return merged;
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -56,41 +56,44 @@ export default function Home() {
 
       <main>
         {/* ── HERO BANNER ── */}
-        <section className="relative overflow-hidden bg-black text-white min-h-[70vh] flex items-center">
+        <section className="relative overflow-hidden bg-black text-white min-h-[65vh] flex items-center">
           <motion.div
             initial={{ scale: 1.1, opacity: 0 }}
-            animate={{ scale: 1, opacity: 0.5 }}
+            animate={{ scale: 1, opacity: 0.45 }}
             transition={{ duration: 1.5, ease: "easeOut" }}
             className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: "url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=1400&h=700')" }}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
 
           <div className="relative max-w-[1400px] mx-auto px-6 sm:px-10 py-16 sm:py-24 w-full">
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-xs tracking-[0.3em] font-medium text-gray-300 uppercase mb-3"
+              className="text-xs tracking-[0.3em] font-bold text-gray-300 uppercase mb-3 flex items-center gap-2"
             >
-              Premium Wall Art
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>{storeSettings.storeName} Storefront</span>
             </motion.p>
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="text-5xl sm:text-6xl md:text-7xl font-bold leading-tight mb-6 max-w-2xl"
+              className="text-4xl sm:text-6xl md:text-7xl font-black leading-tight mb-6 max-w-2xl"
             >
               Elevate Your Space.<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-gray-200 to-gray-500">Inspire Your Day.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-gray-100 via-gray-300 to-gray-500">
+                Inspire Your Walls.
+              </span>
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6 }}
-              className="text-gray-400 text-base sm:text-lg max-w-md mb-10"
+              className="text-gray-300 text-sm sm:text-base max-w-md mb-8 leading-relaxed"
             >
-              Premium quality prints with stunning aesthetics. Bring your walls to life with our exclusive collections.
+              Exclusive high-definition prints with vibrant colors & easy UPI advance checkout.
             </motion.p>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -100,19 +103,19 @@ export default function Home() {
             >
               <button
                 onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-                className="bg-white text-black text-sm font-bold px-8 py-4 hover:bg-gray-100 transition-colors tracking-wide"
+                className="bg-white text-black text-xs sm:text-sm font-bold px-8 py-3.5 hover:bg-gray-100 transition-colors tracking-widest uppercase rounded-lg shadow-lg"
               >
-                SHOP COLLECTION
+                Browse Collection
               </button>
             </motion.div>
           </div>
         </section>
 
         {/* ── PROMO MARQUEE ── */}
-        <PromoBar />
+        <PromoBar text={storeSettings.announcementText} />
 
         {/* ── COLLECTION TILES ── */}
-        <section className="max-w-[1400px] mx-auto px-4 sm:px-6 py-12 sm:py-16">
+        <section className="max-w-[1400px] mx-auto px-4 sm:px-6 py-10 sm:py-14">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             {collections.map((col, i) => (
               <motion.div 
@@ -125,7 +128,7 @@ export default function Home() {
                   setActiveCategory(col.name);
                   document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="relative overflow-hidden cursor-pointer group rounded-lg" 
+                className="relative overflow-hidden cursor-pointer group rounded-xl shadow-sm" 
                 style={{ aspectRatio: '3/4' }}
               >
                 <img
@@ -133,11 +136,13 @@ export default function Home() {
                   alt={col.name}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent group-hover:from-black/90 transition-colors duration-300" />
-                <div className="absolute inset-0 flex items-end justify-start p-5 sm:p-6">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent group-hover:from-black/90 transition-colors duration-300" />
+                <div className="absolute inset-0 flex items-end justify-start p-4 sm:p-6">
                   <div>
-                    <p className="text-white font-bold text-lg sm:text-xl tracking-wide mb-1">{col.name}</p>
-                    <p className="text-gray-300 text-xs sm:text-sm group-hover:text-white transition-colors transform group-hover:translate-x-1 duration-300">Shop Collection →</p>
+                    <p className="text-white font-bold text-base sm:text-lg tracking-wide mb-0.5">{col.name}</p>
+                    <p className="text-gray-300 text-xs group-hover:text-white transition-colors transform group-hover:translate-x-1 duration-300">
+                      Explore Collection →
+                    </p>
                   </div>
                 </div>
               </motion.div>
@@ -148,14 +153,14 @@ export default function Home() {
         {/* ── FEATURED PRODUCTS (WITH FILTERS) ── */}
         <section id="products" className="max-w-[1400px] mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
           
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Our Prints</h2>
-              <p className="text-sm text-gray-500 mt-1">Discover our entire catalog of premium posters.</p>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Our Catalog</h2>
+              <p className="text-sm text-gray-500 mt-1">Discover our exclusive wall art collections.</p>
             </div>
 
             {/* Search Bar */}
-            <div className="relative w-full md:w-72">
+            <div className="relative w-full md:w-80">
               <input 
                 type="text" 
                 placeholder="Search products..."
@@ -169,11 +174,11 @@ export default function Home() {
 
           {/* Category Pills */}
           <div className="flex overflow-x-auto hide-scrollbar gap-2 mb-8 pb-2">
-            {CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`whitespace-nowrap px-5 py-2 rounded-full text-sm font-semibold transition-all ${
+                className={`whitespace-nowrap px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all ${
                   activeCategory === cat 
                     ? 'bg-black text-white shadow-md' 
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -184,15 +189,30 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Products Grid */}
-          {filteredProducts.length === 0 ? (
+          {/* Products Grid / Empty States */}
+          {isProductsLoading ? (
+            <div className="py-20 text-center text-gray-400">
+              <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm font-medium">Loading catalog...</p>
+            </div>
+          ) : products.length === 0 ? (
+            <div className="py-16 px-6 text-center bg-gray-50 rounded-2xl border border-gray-200 max-w-xl mx-auto my-8">
+              <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                🎨
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-1">New Collection Dropping Soon</h3>
+              <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
+                The store catalog is currently being updated with brand new prints. Please check back shortly!
+              </p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="py-20 text-center text-gray-500">
               <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium text-gray-900">No products found</p>
-              <p className="text-sm">Try adjusting your search or category filter.</p>
+              <p className="text-lg font-bold text-gray-900">No products match your filter</p>
+              <p className="text-sm text-gray-500">Try adjusting your search or category filter.</p>
               <button 
                 onClick={() => {setSearchQuery(""); setActiveCategory("All");}}
-                className="mt-4 text-sm font-bold underline"
+                className="mt-4 text-xs font-bold uppercase tracking-widest text-black underline"
               >
                 Clear Filters
               </button>
@@ -252,7 +272,7 @@ export default function Home() {
 
         {/* ── FOOTER ── */}
         <footer className="bg-white border-t border-gray-100 py-12 text-center text-xs tracking-wide">
-          <p className="text-black font-black text-xl mb-2 tracking-tighter">PIXELPRESS</p>
+          <p className="text-black font-black text-xl mb-2 tracking-tighter">{storeSettings.storeName}</p>
           <p className="text-gray-500">Premium Wall Art • © 2026</p>
         </footer>
       </main>

@@ -1,12 +1,25 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, UploadCloud, CheckCircle } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, UploadCloud, CheckCircle, Copy, ExternalLink } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { compressImage } from '../lib/imageUtils';
 
 export default function CartDrawer() {
-  const { cart, isCartOpen, setIsCartOpen, removeFromCart, updateCartQuantity, checkoutCart, user, login } = useAppContext();
+  const { 
+    cart, 
+    isCartOpen, 
+    setIsCartOpen, 
+    removeFromCart, 
+    updateCartQuantity, 
+    checkoutCart, 
+    user, 
+    login,
+    storeSettings,
+    showToast
+  } = useAppContext();
+
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
   
@@ -14,6 +27,7 @@ export default function CartDrawer() {
   const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
   const [isOrdering, setIsOrdering] = useState(false);
   const [error, setError] = useState('');
+  const [copiedUpi, setCopiedUpi] = useState(false);
   
   // Payment step state
   const [screenshotFile, setScreenshotFile] = useState(null);
@@ -25,8 +39,8 @@ export default function CartDrawer() {
   // Sync state if user changes
   React.useEffect(() => {
     if (user) {
-      setName(user.name);
-      setPhone(user.phone);
+      setName(user.name || '');
+      setPhone(user.phone || '');
     }
   }, [user]);
 
@@ -40,8 +54,51 @@ export default function CartDrawer() {
     }
   }, [isCartOpen]);
 
+  // Calculate dynamic total and advance amounts based on store settings & per-product rules
   const totalAmount = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const advanceAmount = Math.max(100, Math.floor(totalAmount * 0.2)); // 20% advance or minimum 100
+
+  const calculateAdvanceAmount = () => {
+    if (cart.length === 0) return 0;
+    
+    let totalAdvance = 0;
+    let hasCustomAdvance = false;
+
+    cart.forEach(item => {
+      const p = item.product;
+      const itemTotal = p.price * item.quantity;
+
+      if (p.advanceType === 'fixed') {
+        totalAdvance += (Number(p.advanceValue) || 0) * item.quantity;
+        hasCustomAdvance = true;
+      } else if (p.advanceType === 'percentage') {
+        const pct = Number(p.advanceValue) || 0;
+        totalAdvance += Math.round(itemTotal * (pct / 100));
+        hasCustomAdvance = true;
+      } else if (p.advanceType === 'zero') {
+        hasCustomAdvance = true;
+      } else {
+        // Default store percentage
+        const pct = Number(storeSettings.defaultAdvancePercent) || 20;
+        totalAdvance += Math.round(itemTotal * (pct / 100));
+      }
+    });
+
+    if (!hasCustomAdvance) {
+      const minAdv = Number(storeSettings.minAdvanceAmount) || 100;
+      totalAdvance = Math.max(minAdv, totalAdvance);
+    }
+
+    return Math.min(totalAmount, Math.max(0, totalAdvance));
+  };
+
+  const advanceAmount = calculateAdvanceAmount();
+
+  const handleCopyUpi = () => {
+    navigator.clipboard.writeText(storeSettings.upiId);
+    setCopiedUpi(true);
+    showToast('UPI ID copied to clipboard!');
+    setTimeout(() => setCopiedUpi(false), 2000);
+  };
 
   const handleProceedToPayment = (e) => {
     e.preventDefault();
@@ -59,7 +116,6 @@ export default function CartDrawer() {
       return;
     }
     
-    // Validate login and save user locally for the session
     if (!user) {
       login(customerName, customerPhone);
     }
@@ -67,16 +123,24 @@ export default function CartDrawer() {
     setStep('payment');
   };
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setScreenshotFile(file);
-      setScreenshotPreview(URL.createObjectURL(file));
+      try {
+        setError('');
+        const compressed = await compressImage(file, 800, 800, 0.7);
+        setScreenshotFile(file);
+        setScreenshotPreview(compressed.dataUrl);
+      } catch (err) {
+        console.warn('Image preview compression error:', err);
+        setScreenshotFile(file);
+        setScreenshotPreview(URL.createObjectURL(file));
+      }
     }
   };
 
   const handleFinalCheckout = async () => {
-    if (!screenshotFile) {
+    if (!screenshotFile && !screenshotPreview) {
       setError('Please upload the payment screenshot to proceed.');
       return;
     }
@@ -85,51 +149,74 @@ export default function CartDrawer() {
       setIsUploading(true);
       setError('');
       
-      let uploadedUrl = null;
+      let finalScreenshotUrl = null;
 
-      // Only upload if Supabase is actually configured
-      if (isSupabaseConfigured && supabase) {
-        const fileExt = screenshotFile.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const filePath = `advance_payments/${fileName}`;
+      // 1. Compress image to high-efficiency WebP/JPEG
+      let compressed;
+      try {
+        compressed = await compressImage(screenshotFile, 900, 900, 0.75);
+      } catch (cErr) {
+        console.warn('Compression fallback to preview:', cErr);
+      }
 
-        const { data, error: uploadError } = await supabase.storage
-          .from('payment_screenshots')
-          .upload(filePath, screenshotFile);
+      const uploadDataUrl = compressed?.dataUrl || screenshotPreview;
 
-        if (uploadError) {
-          throw new Error('Failed to upload screenshot. Please try again.');
+      // 2. Try Supabase storage upload with graceful fallback to compressed dataUrl
+      if (isSupabaseConfigured && supabase && compressed?.blob) {
+        try {
+          const fileName = `adv_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+          const filePath = `advance_payments/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('payment_screenshots')
+            .upload(filePath, compressed.blob, { contentType: 'image/jpeg' });
+
+          if (!uploadError) {
+            const { data: publicUrlData } = supabase.storage
+              .from('payment_screenshots')
+              .getPublicUrl(filePath);
+            finalScreenshotUrl = publicUrlData?.publicUrl || uploadDataUrl;
+          } else {
+            console.warn('Storage upload error, using direct image data:', uploadError.message);
+            finalScreenshotUrl = uploadDataUrl;
+          }
+        } catch (sErr) {
+          console.warn('Storage connection warning, using direct image data:', sErr);
+          finalScreenshotUrl = uploadDataUrl;
         }
-
-        const { data: publicUrlData } = supabase.storage
-          .from('payment_screenshots')
-          .getPublicUrl(filePath);
-          
-        uploadedUrl = publicUrlData.publicUrl;
       } else {
-        // Fallback for local demo mode
-        uploadedUrl = screenshotPreview;
+        finalScreenshotUrl = uploadDataUrl;
       }
 
       setIsOrdering(true);
       const customerName = (user?.name || name).trim();
       const customerPhone = (user?.phone || phone).trim();
       
-      await checkoutCart({ name: customerName, phone: customerPhone }, uploadedUrl);
+      await checkoutCart(
+        { name: customerName, phone: customerPhone }, 
+        finalScreenshotUrl,
+        advanceAmount
+      );
       
       setStep('success');
+      showToast('Order submitted successfully!');
       setTimeout(() => {
         setIsCartOpen(false);
         navigate('/orders');
-      }, 2500);
+      }, 2200);
 
     } catch (err) {
-      setError(err.message || 'An error occurred during checkout.');
+      console.error('Checkout error:', err);
+      setError(err.message || 'An error occurred during checkout. Please try again.');
     } finally {
       setIsUploading(false);
       setIsOrdering(false);
     }
   };
+
+  // Dynamic QR Code URL (custom uploaded QR or generated UPI QR)
+  const upiPayDeepLink = `upi://pay?pa=${encodeURIComponent(storeSettings.upiId)}&pn=${encodeURIComponent(storeSettings.storeName)}&am=${advanceAmount}&cu=INR&tn=Advance%20Payment`;
+  const dynamicQrCodeUrl = storeSettings.upiQrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiPayDeepLink)}`;
 
   return (
     <AnimatePresence>
@@ -183,67 +270,118 @@ export default function CartDrawer() {
                 </motion.div>
                 <h3 className="text-xl font-bold text-gray-900">Payment Submitted!</h3>
                 <p className="text-gray-500 text-sm">
-                  Your order is pending payment review. Taking you to My Orders...
+                  Your order has been sent for payment review. Redirecting you to My Orders...
                 </p>
               </div>
             ) : step === 'payment' ? (
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col items-center space-y-6">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col items-center space-y-5">
                 <div className="text-center space-y-2 w-full">
-                  <p className="text-sm text-gray-600">Please pay the advance amount to confirm your order. The balance can be paid on delivery.</p>
-                  <div className="bg-gray-50 p-4 border border-gray-200 rounded-lg">
-                    <p className="text-xs uppercase tracking-widest text-gray-500 font-semibold mb-1">Advance Amount</p>
-                    <p className="text-3xl font-bold text-black">₹{advanceAmount}</p>
-                    <p className="text-xs text-gray-400 mt-1">Total: ₹{totalAmount} (Balance: ₹{totalAmount - advanceAmount})</p>
+                  <p className="text-xs text-gray-600 leading-relaxed">
+                    Please pay the advance amount below to confirm your order. The remaining balance (₹{totalAmount - advanceAmount}) will be paid on delivery.
+                  </p>
+                  <div className="bg-gradient-to-br from-gray-900 to-black text-white p-4 rounded-xl shadow-sm">
+                    <p className="text-[11px] uppercase tracking-widest text-gray-400 font-semibold mb-0.5">Required Advance</p>
+                    <p className="text-3xl font-black text-white">₹{advanceAmount}</p>
+                    <p className="text-xs text-gray-300 mt-1">Total Order: ₹{totalAmount}</p>
                   </div>
                 </div>
 
-                {/* Mock QR Code for Demo */}
-                <div className="bg-white p-4 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center">
-                  <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="UPI QR Code" className="w-40 h-40 opacity-80" />
-                  <p className="font-mono text-sm font-bold mt-3 text-gray-800">pixelpress@upi</p>
-                  <p className="text-xs text-gray-500 mt-1">Scan or use UPI ID to pay</p>
+                {/* Dynamic QR Scanner & UPI Info */}
+                <div className="bg-white p-4 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center w-full shadow-sm">
+                  <img 
+                    src={dynamicQrCodeUrl} 
+                    alt="UPI QR Code" 
+                    className="w-44 h-44 object-contain rounded-lg shadow-sm border border-gray-100" 
+                  />
+
+                  {/* UPI ID Pill with Copy */}
+                  <div className="mt-3 flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full w-full justify-between">
+                    <span className="font-mono text-xs font-bold text-gray-800 truncate">
+                      {storeSettings.upiId}
+                    </span>
+                    <button
+                      onClick={handleCopyUpi}
+                      className="p-1 hover:bg-gray-200 rounded-full transition-colors flex items-center gap-1 text-[11px] font-semibold text-gray-700"
+                      title="Copy UPI ID"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>{copiedUpi ? 'Copied!' : 'Copy'}</span>
+                    </button>
+                  </div>
+
+                  {/* Direct Mobile UPI Pay button */}
+                  <a
+                    href={upiPayDeepLink}
+                    className="mt-3 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-blue-200"
+                  >
+                    <span>Pay with any UPI App</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
                 </div>
 
-                <div className="w-full space-y-3">
-                  <label className="block text-sm font-semibold text-gray-900">Upload Payment Screenshot *</label>
-                  <div className="relative border-2 border-gray-200 border-dashed rounded-lg p-6 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer overflow-hidden">
+                {/* Screenshot Upload Box */}
+                <div className="w-full space-y-2">
+                  <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider">
+                    Upload Payment Screenshot *
+                  </label>
+                  <div className="relative border-2 border-gray-300 border-dashed rounded-xl p-5 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer overflow-hidden min-h-[120px]">
                     {screenshotPreview ? (
                       <>
-                        <img src={screenshotPreview} alt="Screenshot" className="absolute inset-0 w-full h-full object-cover opacity-60" />
-                        <div className="relative z-10 bg-white/90 px-4 py-2 rounded-full shadow-sm text-sm font-semibold flex items-center space-x-2">
-                           <span>Change Image</span>
+                        <img 
+                          src={screenshotPreview} 
+                          alt="Screenshot" 
+                          className="absolute inset-0 w-full h-full object-cover opacity-70" 
+                        />
+                        <div className="relative z-10 bg-white/95 px-4 py-2 rounded-full shadow-md text-xs font-bold flex items-center space-x-2 text-gray-900 border border-gray-200">
+                           <span>Change Screenshot</span>
                         </div>
                       </>
                     ) : (
                       <>
-                        <UploadCloud className="w-8 h-8 text-gray-400 mb-2" />
-                        <p className="text-sm font-medium text-gray-600">Tap to upload screenshot</p>
-                        <p className="text-xs text-gray-400 mt-1">JPG, PNG up to 5MB</p>
+                        <UploadCloud className="w-8 h-8 text-gray-400 mb-1" />
+                        <p className="text-xs font-bold text-gray-700">Tap to upload payment screenshot</p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">JPG, PNG, WebP supported</p>
                       </>
                     )}
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleImageChange} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                    />
                   </div>
                 </div>
                 
-                {error && <p className="text-xs text-red-600 bg-red-50 p-2 border border-red-200 w-full text-center">{error}</p>}
+                {error && (
+                  <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200 w-full text-center font-medium">
+                    {error}
+                  </p>
+                )}
 
                 <div className="w-full mt-auto pt-4 border-t border-gray-100 flex gap-3">
-                  <button onClick={() => setStep('cart')} className="flex-1 py-3.5 border border-gray-200 text-sm font-semibold hover:bg-gray-50 transition-colors uppercase tracking-widest text-gray-600">
+                  <button 
+                    onClick={() => setStep('cart')} 
+                    className="flex-1 py-3.5 border border-gray-200 text-xs font-bold hover:bg-gray-50 transition-colors uppercase tracking-widest text-gray-600 rounded-lg"
+                  >
                     Back
                   </button>
-                  <button onClick={handleFinalCheckout} disabled={isUploading || isOrdering || !screenshotFile} className="flex-[2] bg-black hover:bg-gray-800 text-white text-xs font-semibold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors disabled:opacity-50">
-                    <span>{isUploading || isOrdering ? 'Processing...' : 'Submit Order'}</span>
+                  <button 
+                    onClick={handleFinalCheckout} 
+                    disabled={isUploading || isOrdering || !screenshotPreview} 
+                    className="flex-[2] bg-black hover:bg-gray-800 text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors disabled:opacity-50 rounded-lg shadow-md"
+                  >
+                    <span>{isUploading || isOrdering ? 'Submitting Order...' : 'Submit Order'}</span>
                   </button>
                 </div>
               </div>
             ) : cart.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                 <div className="text-5xl mb-3">🛍️</div>
-                <h3 className="text-base font-semibold text-gray-900">Your cart is empty</h3>
-                <p className="text-gray-400 text-xs mt-1 mb-6">Explore our trending posters and add them to cart!</p>
+                <h3 className="text-base font-bold text-gray-900">Your cart is empty</h3>
+                <p className="text-gray-400 text-xs mt-1 mb-6">Explore our catalog and add your favourite items!</p>
                 <button
                   onClick={() => setIsCartOpen(false)}
-                  className="bg-black text-white text-xs font-semibold px-6 py-2.5 uppercase tracking-widest hover:bg-gray-800 transition-colors"
+                  className="bg-black text-white text-xs font-bold px-6 py-3 uppercase tracking-widest hover:bg-gray-800 transition-colors rounded-lg shadow-sm"
                 >
                   Start Shopping
                 </button>
@@ -257,12 +395,12 @@ export default function CartDrawer() {
                       <img
                         src={item.product.image}
                         alt={item.product.name}
-                        className="w-16 h-20 object-cover bg-gray-100 flex-shrink-0"
+                        className="w-16 h-20 object-cover bg-gray-100 rounded-lg flex-shrink-0 border border-gray-200 shadow-sm"
                       />
                       <div className="flex-1 flex flex-col justify-between">
                         <div>
                           <div className="flex justify-between items-start">
-                            <h4 className="text-sm font-semibold text-gray-900 line-clamp-1">{item.product.name}</h4>
+                            <h4 className="text-sm font-bold text-gray-900 line-clamp-1">{item.product.name}</h4>
                             <button
                               onClick={() => removeFromCart(item.product.id)}
                               className="text-gray-400 hover:text-red-500 transition-colors p-1"
@@ -270,21 +408,27 @@ export default function CartDrawer() {
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                          <p className="text-sm font-bold text-gray-900 mt-0.5">₹{item.product.price}</p>
+                          <p className="text-sm font-extrabold text-gray-900 mt-0.5">₹{item.product.price}</p>
+                          {item.product.advanceType && item.product.advanceType !== 'default' && (
+                            <span className="inline-block mt-1 text-[10px] font-semibold text-brand-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                              {item.product.advanceType === 'fixed' ? `₹${item.product.advanceValue} Advance` : 
+                               item.product.advanceType === 'percentage' ? `${item.product.advanceValue}% Advance` : 'Full COD'}
+                            </span>
+                          )}
                         </div>
 
                         {/* Quantity */}
-                        <div className="flex items-center space-x-2 border border-gray-200 w-max px-1 py-0.5 mt-2">
+                        <div className="flex items-center space-x-2 border border-gray-200 w-max px-1.5 py-0.5 mt-2 rounded-lg bg-gray-50">
                           <button
                             onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
-                            className="p-1 hover:bg-gray-100 text-gray-600"
+                            className="p-1 hover:bg-gray-200 text-gray-700 rounded"
                           >
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="text-xs font-semibold px-2">{item.quantity}</span>
+                          <span className="text-xs font-bold px-2">{item.quantity}</span>
                           <button
                             onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
-                            className="p-1 hover:bg-gray-100 text-gray-600"
+                            className="p-1 hover:bg-gray-200 text-gray-700 rounded"
                           >
                             <Plus className="w-3 h-3" />
                           </button>
@@ -297,8 +441,8 @@ export default function CartDrawer() {
                 {/* Checkout Section & Customer Details */}
                 <div className="p-4 sm:p-5 border-t border-gray-200 bg-gray-50/50 space-y-4">
                   {/* Customer Info Form */}
-                  <div className="bg-white p-3 border border-gray-200 space-y-2">
-                    <p className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
+                  <div className="bg-white p-3.5 border border-gray-200 rounded-xl space-y-2 shadow-sm">
+                    <p className="text-[11px] font-bold tracking-wider text-gray-500 uppercase">
                       Ordering Customer Details:
                     </p>
                     <div className="grid grid-cols-2 gap-2">
@@ -308,7 +452,7 @@ export default function CartDrawer() {
                         value={user?.name || name}
                         onChange={e => setName(e.target.value)}
                         disabled={Boolean(user?.name)}
-                        className="w-full text-xs border border-gray-300 p-2 focus:outline-none focus:border-black disabled:bg-gray-100"
+                        className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 font-medium"
                       />
                       <input
                         type="tel"
@@ -316,25 +460,25 @@ export default function CartDrawer() {
                         value={user?.phone || phone}
                         onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         disabled={Boolean(user?.phone)}
-                        className="w-full text-xs border border-gray-300 p-2 focus:outline-none focus:border-black disabled:bg-gray-100"
+                        className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 font-medium"
                       />
                     </div>
                   </div>
 
                   {error && (
-                    <p className="text-xs text-red-600 bg-red-50 p-2 border border-red-200">{error}</p>
+                    <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200 font-medium">{error}</p>
                   )}
 
                   <div className="flex justify-between items-center text-sm font-bold text-gray-900">
                     <span>Total Amount:</span>
-                    <span className="text-lg">₹{totalAmount}</span>
+                    <span className="text-xl font-black">₹{totalAmount}</span>
                   </div>
 
                   <button
                     onClick={handleProceedToPayment}
-                    className="w-full bg-black hover:bg-gray-800 text-white text-xs font-semibold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors"
+                    className="w-full bg-black hover:bg-gray-800 text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
                   >
-                    <span>Proceed to Payment</span>
+                    <span>Proceed to Advance Payment</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

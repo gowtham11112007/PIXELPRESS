@@ -1,18 +1,19 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingCart, LogOut, Store } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Sliders, LogOut, Store } from 'lucide-react';
 import { useSeller } from '../context/SellerContext';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
 
 const Sidebar = () => {
-  const { user, pendingOrdersCount, logout } = useSeller();
+  const { user, pendingOrdersCount, logout, storeSettings } = useSeller();
   const location = useLocation();
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Products', path: '/products', icon: Package },
     { name: 'Orders', path: '/orders', icon: ShoppingCart, badge: pendingOrdersCount },
+    { name: 'Store Settings', path: '/settings', icon: Sliders },
   ];
 
   return (
@@ -22,7 +23,7 @@ const Sidebar = () => {
           <Store size={20} />
         </div>
         <div>
-          <h1 className="font-bold text-xl text-slate-900 tracking-tight">PixelPress</h1>
+          <h1 className="font-bold text-xl text-slate-900 tracking-tight">{storeSettings?.storeName || 'PixelPress'}</h1>
           <p className="text-xs text-slate-500 font-medium tracking-wide">SELLER HUB</p>
         </div>
       </div>
@@ -48,7 +49,7 @@ const Sidebar = () => {
               className={clsx(
                 "relative flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150 z-10",
                 isActive 
-                  ? "text-brand-700" 
+                  ? "text-brand-700 font-bold" 
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               )}
             >
@@ -65,7 +66,7 @@ const Sidebar = () => {
                 {item.name}
               </div>
               {item.badge > 0 && (
-                <span className="bg-brand-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm">
+                <span className="bg-brand-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10 shadow-sm animate-pulse">
                   {item.badge}
                 </span>
               )}
