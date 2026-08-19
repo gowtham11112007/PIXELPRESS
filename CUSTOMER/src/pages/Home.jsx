@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, Truck, Zap, Pin, ArrowRight } from 'lucide-react';
+import { Search, Sparkles, Zap, Pin, ArrowRight, Star, ShieldCheck } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import ProductCard from '../components/ProductCard';
 import OrderModal from '../components/OrderModal';
@@ -8,7 +8,7 @@ import { useAppContext } from '../context/AppContext';
 
 // Scrolling promo bar below hero
 function PromoBar({ text }) {
-  const defaultText = "⚡ ORDER TODAY, RECEIVE TOMORROW IN YOUR HOSTEL ROOM ✦ 100% HD PRINTS & PINS ✦ FREE CAMPUS DELIVERY";
+  const defaultText = "⚡ ORDER TODAY, GET IT DELIVERED TOMORROW ✦ 100% ULTRA-HD 300+ DPI PRINTS ✦ PREMIUM MATTE & GLOSS FINISH ✦ FREE FAST DELIVERY";
   const displayText = (text || defaultText) + "      ";
   return (
     <div className="bg-slate-950 text-amber-400 text-[11px] tracking-widest font-black overflow-hidden py-2.5 border-y border-slate-800">
@@ -49,6 +49,13 @@ export default function Home() {
     });
   }, [products, searchQuery, activeCategory]);
 
+  // Safety: reset activeCategory if a deleted collection was selected
+  React.useEffect(() => {
+    if (activeCategory !== 'All' && !categories.includes(activeCategory)) {
+      setActiveCategory('All');
+    }
+  }, [categories, activeCategory]);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }} 
@@ -59,8 +66,8 @@ export default function Home() {
       <Navbar />
 
       <main>
-        {/* ── HERO BANNER (CAMPUS FOCUSED) ── */}
-        <section className="relative overflow-hidden bg-slate-950 text-white min-h-[55vh] sm:min-h-[60vh] flex items-center">
+        {/* ── HERO BANNER (SPEED DELIVERY & PREMIUM HD QUALITY) ── */}
+        <section className="relative overflow-hidden bg-slate-950 text-white min-h-[60vh] sm:min-h-[65vh] flex items-center">
           <motion.div
             initial={{ scale: 1.05, opacity: 0 }}
             animate={{ scale: 1, opacity: 0.35 }}
@@ -68,7 +75,7 @@ export default function Home() {
             className="absolute inset-0 bg-cover bg-center"
             style={{ backgroundImage: "url('https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=1400&h=700')" }}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-slate-900/60" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-slate-900/60" />
 
           <div className="relative max-w-[1400px] mx-auto px-5 sm:px-10 py-14 sm:py-20 w-full">
             {/* Delivery Guarantee Pill */}
@@ -76,21 +83,21 @@ export default function Home() {
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="inline-flex items-center gap-2 bg-amber-400/15 border border-amber-400/30 text-amber-300 text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wider mb-4"
+              className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400/20 to-orange-500/20 border border-amber-400/40 text-amber-300 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider mb-5 backdrop-blur-md shadow-inner"
             >
-              <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              <span>Next-Day Campus & Hostel Delivery</span>
+              <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400 animate-pulse" />
+              <span>⚡ Express 24-Hour Delivery • 300+ DPI Studio Quality</span>
             </motion.div>
 
             <motion.h1 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-3xl sm:text-5xl md:text-6xl font-black leading-tight mb-4 max-w-2xl tracking-tight"
+              className="text-3xl sm:text-5xl md:text-6xl font-black leading-tight mb-4 max-w-3xl tracking-tight"
             >
-              Level Up Your Hostel Room.<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-100 to-white">
-                Delivered Tomorrow.
+              Premium HD Prints & Custom Merch.<br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-amber-200 to-yellow-400">
+                Delivered at Lightning Speed.
               </span>
             </motion.h1>
 
@@ -98,24 +105,69 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="text-slate-300 text-xs sm:text-sm max-w-lg mb-6 leading-relaxed"
+              className="text-slate-300 text-xs sm:text-sm md:text-base max-w-xl mb-7 leading-relaxed font-medium"
             >
-              Order custom wall setups, anime splits, motivational posters, and aesthetic pins. Placed before 9 PM? Get it tomorrow directly at your hostel or department!
+              Upgrade your room with vibrant, museum-grade 300+ DPI posters, multi-frame split art, and premium pins. Order today & enjoy guaranteed express doorstep delivery tomorrow!
             </motion.p>
 
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="flex flex-wrap gap-3"
+              className="flex flex-wrap items-center gap-3 mb-8"
             >
               <button
                 onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
-                className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-black px-7 py-3.5 transition-all tracking-wider uppercase rounded-xl shadow-lg flex items-center gap-2"
+                className="bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-black px-7 py-3.5 transition-all tracking-wider uppercase rounded-xl shadow-lg hover:shadow-amber-400/20 flex items-center gap-2 cursor-pointer"
               >
-                <span>Shop Campus Merch</span>
+                <span>Explore Top Prints</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
+              <button
+                onClick={() => document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' })}
+                className="bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-bold px-6 py-3.5 transition-all tracking-wider uppercase rounded-xl border border-white/20 backdrop-blur-sm flex items-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Custom Prints</span>
+              </button>
+            </motion.div>
+
+            {/* Micro Feature Badges */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="grid grid-cols-3 gap-3 sm:gap-6 pt-4 border-t border-slate-800/80 max-w-xl text-left"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center flex-shrink-0">
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-[11px] sm:text-xs font-black text-white leading-tight">24H Express</p>
+                  <p className="text-[10px] text-slate-400 leading-tight">Fast doorstep drop</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center flex-shrink-0">
+                  <Star className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-[11px] sm:text-xs font-black text-white leading-tight">300+ DPI Ultra HD</p>
+                  <p className="text-[10px] text-slate-400 leading-tight">Crisp & fade-proof</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center flex-shrink-0">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-[11px] sm:text-xs font-black text-white leading-tight">100% Guaranteed</p>
+                  <p className="text-[10px] text-slate-400 leading-tight">Premium cardstock</p>
+                </div>
+              </div>
             </motion.div>
           </div>
         </section>
@@ -199,8 +251,8 @@ export default function Home() {
         <section id="products" className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-16">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Campus Catalog</h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">All items guaranteed next-day delivery to your hostel.</p>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Trending Prints & Merch</h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Premium HD quality prints with guaranteed lightning-fast 24h delivery.</p>
             </div>
 
             {/* Search Bar */}
@@ -222,7 +274,7 @@ export default function Home() {
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer ${
                   activeCategory === cat 
                     ? 'bg-slate-900 text-white shadow-md' 
                     : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
@@ -237,7 +289,7 @@ export default function Home() {
           {isProductsLoading ? (
             <div className="py-20 text-center text-slate-400">
               <div className="w-8 h-8 border-2 border-slate-900 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-xs font-semibold">Loading campus collection...</p>
+              <p className="text-xs font-semibold">Loading prints collection...</p>
             </div>
           ) : products.length === 0 ? (
             <div className="py-16 px-6 text-center bg-white rounded-3xl border border-slate-200 border-dashed max-w-xl mx-auto my-6">
@@ -246,7 +298,7 @@ export default function Home() {
               </div>
               <h3 className="text-base font-bold text-slate-900 mb-1">New Drops Coming Soon</h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                The campus store is updating stock. Admin will add new posters shortly!
+                The store is updating stock. Admin will add new posters shortly!
               </p>
             </div>
           ) : filteredProducts.length === 0 ? (
@@ -256,7 +308,7 @@ export default function Home() {
               <p className="text-xs text-slate-400 mt-1">Try another category or keyword.</p>
               <button 
                 onClick={() => {setSearchQuery(""); setActiveCategory("All");}}
-                className="mt-4 text-xs font-bold uppercase tracking-widest text-slate-900 underline"
+                className="mt-4 text-xs font-bold uppercase tracking-widest text-slate-900 underline cursor-pointer"
               >
                 Reset Filter
               </button>
@@ -287,16 +339,16 @@ export default function Home() {
           )}
         </section>
 
-        {/* ── CAMPUS PROMISES ── */}
+        {/* ── SPEED DELIVERY & QUALITY PROMISES ── */}
         <section className="bg-slate-950 text-white py-14 border-t border-slate-800">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8 text-center">
               {[
-                { icon: "⚡", title: "Next-Day Delivery", sub: "Hostel room & Dept drops" },
-                { icon: "🎨", title: "Custom Prints", sub: "Print your own high-res photos" },
-                { icon: "💵", title: "Easy Advance + COD", sub: "Pay balance on delivery" },
-                { icon: "💬", title: "WhatsApp Alert", sub: "Instant delivery updates" },
-              ].map((item, i) => (
+                { icon: "⚡", title: "Lightning Delivery", sub: "Dispatched in 24h to your doorstep" },
+                { icon: "💎", title: "300+ DPI Ultra-HD", sub: "Rich colors & fade-proof finish" },
+                { icon: "🎨", title: "Custom Prints", sub: "Print your own photos & art" },
+                { icon: "💵", title: "Easy Advance + COD", sub: "Pay balance upon delivery" },
+              ].map((item) => (
                 <div key={item.title} className="flex flex-col items-center gap-2">
                   <span className="text-2xl bg-white/10 p-3 rounded-2xl mb-1">{item.icon}</span>
                   <p className="text-xs sm:text-sm font-bold tracking-wide uppercase">{item.title}</p>

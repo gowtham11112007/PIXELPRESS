@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Layers, Plus, Trash2, Edit3, Image as ImageIcon, Sparkles, X, Upload } from 'lucide-react';
+import { Layers, Plus, Trash2, Edit3, Sparkles, X, Upload } from 'lucide-react';
 import { useSeller } from '../context/SellerContext';
 import { compressImage } from '../lib/imageUtils';
 
 export default function Collections() {
-  const { collections, addCollection, updateCollection, deleteCollection, products, showToast } = useSeller();
+  const { collections, addCollection, updateCollection, deleteCollection, products } = useSeller();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCollection, setEditingCollection] = useState(null);

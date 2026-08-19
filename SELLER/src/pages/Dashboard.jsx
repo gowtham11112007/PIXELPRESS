@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Package, Clock, CheckCircle, Truck, Layers, MapPin } from 'lucide-react';
+import { Package, Clock, Truck, Layers, MapPin } from 'lucide-react';
 import { useSeller } from '../context/SellerContext';
 import StatCard from '../components/StatCard';
 import { Link } from 'react-router-dom';

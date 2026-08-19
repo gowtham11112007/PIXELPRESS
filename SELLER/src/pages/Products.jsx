@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Package, Search, Pin, Sparkles } from 'lucide-react';
+import { Plus, Package, Search } from 'lucide-react';
 import { useSeller } from '../context/SellerContext';
 import ProductCard from '../components/ProductCard';
 import ProductFormModal from '../components/ProductFormModal';

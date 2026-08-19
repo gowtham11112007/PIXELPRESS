@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, CheckCircle2, XCircle, MessageCircle, MapPin, Truck, Printer, Sparkles } from 'lucide-react';
+import { Clock, CheckCircle2, XCircle, MessageCircle, MapPin, Truck, Printer } from 'lucide-react';
 
 export default function OrderCard({ order }) {
   const isAccepted = order.status === 'Accepted' || order.status === 'Printing';
@@ -99,7 +99,7 @@ export default function OrderCard({ order }) {
             {!isRejected && (
               <div className="mt-3 pt-3 border-t border-slate-100">
                 <div className="grid grid-cols-4 gap-1 text-center">
-                  {steps.map((s, idx) => (
+                  {steps.map((s) => (
                     <div key={s.label} className="flex flex-col items-center">
                       <div className={`h-1.5 w-full rounded-full mb-1 transition-colors ${
                         s.done ? 'bg-emerald-500' : 'bg-slate-200'

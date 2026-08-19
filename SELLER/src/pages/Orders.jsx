@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSeller } from '../context/SellerContext';
 import OrderCard from '../components/OrderCard';
-import { RefreshCw, Search, Truck, Clock, CheckCircle2, IndianRupee, MapPin } from 'lucide-react';
+import { Search, Truck, CheckCircle2, IndianRupee } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const TABS = ['All', 'Pending Review', 'Printing', 'Out for Delivery', 'Delivered', 'Rejected'];

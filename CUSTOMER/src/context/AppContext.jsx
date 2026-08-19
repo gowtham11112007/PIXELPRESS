@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { mockProducts } from '../data/mockProducts';
 
 const AppContext = createContext();
 
@@ -9,7 +10,7 @@ const DEFAULT_STORE_SETTINGS = {
   defaultAdvancePercent: 20,
   minAdvanceAmount: 100,
   storeName: 'PixelPress Campus',
-  announcementText: '⚡ NEXT-DAY HOSTEL DELIVERY ✦ ORDER BEFORE 9 PM FOR TOMORROW DELIVERY ✦ FREE CAMPUS DELIVERY'
+  announcementText: '⚡ LIGHTNING FAST 24-HOUR DELIVERY ✦ 300+ DPI ULTRA-HD PRINTS ✦ PREMIUM QUALITY GUARANTEED ✦ FREE FAST DELIVERY'
 };
 
 const DEFAULT_COLLECTIONS = [
@@ -19,6 +20,52 @@ const DEFAULT_COLLECTIONS = [
   { id: 'col-4', name: 'Pins & Stickers', description: 'Laminated stickers, pins & badges', image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&q=80&w=400&h=500' },
   { id: 'col-5', name: 'Custom Prints', description: 'Print your own photos & fan art', image: 'https://images.unsplash.com/photo-1508269720743-346d0a799015?auto=format&fit=crop&q=80&w=400&h=500' }
 ];
+
+// Helper: normalize order structure
+function normalizeCustomerOrder(o) {
+  let parsedNotes = {};
+  if (o.notes) {
+    try {
+      parsedNotes = typeof o.notes === 'string' ? JSON.parse(o.notes) : o.notes;
+    } catch {
+      parsedNotes = { rawNotes: o.notes };
+    }
+  }
+
+  const productName = o.product?.name || o.product_name || o.productName || 'Poster Set';
+  const productPrice = o.product?.price ?? o.product_price ?? o.productPrice ?? 0;
+  const productImage = o.product?.image || o.product_image || o.productImage || '';
+  const customerName = o.customer_name || o.customerName || 'Student';
+  const customerPhone = o.customer_phone || o.customerPhone || '';
+  const quantity = Number(o.quantity) || 1;
+  const totalAmount = o.total_amount ?? o.totalAmount ?? (productPrice * quantity);
+
+  return {
+    id: o.id,
+    product: {
+      name: productName,
+      price: productPrice,
+      image: productImage
+    },
+    productName,
+    productImage,
+    productPrice,
+    quantity,
+    totalAmount,
+    status: o.status || 'Pending',
+    date: o.created_at || o.date || o.timestamp || new Date().toISOString(),
+    timestamp: o.created_at || o.date || o.timestamp || new Date().toISOString(),
+    campusLocation: o.campusLocation || parsedNotes.campusLocation || parsedNotes.hostelOrDept || 'Campus Delivery',
+    deliverySlot: o.deliverySlot || parsedNotes.deliverySlot || '⚡ Next-Day Campus Delivery',
+    notes: o.notes,
+    paymentScreenshotUrl: o.paymentScreenshotUrl || parsedNotes.paymentScreenshotUrl || o.payment_screenshot_url || null,
+    advanceAmount: o.advanceAmount ?? parsedNotes.advanceAmount ?? null,
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    customerName,
+    customerPhone
+  };
+}
 
 export function AppProvider({ children }) {
   // 1. User State (persisted in localStorage + synced to Supabase)
@@ -35,7 +82,15 @@ export function AppProvider({ children }) {
   const [authLoading, setAuthLoading] = useState(true);
 
   // Products & Collections
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pixelpress_products');
+      return saved ? JSON.parse(saved) : mockProducts;
+    } catch {
+      return mockProducts;
+    }
+  });
+
   const [collections, setCollections] = useState(() => {
     try {
       const saved = localStorage.getItem('pixelpress_collections');
@@ -44,6 +99,7 @@ export function AppProvider({ children }) {
       return DEFAULT_COLLECTIONS;
     }
   });
+
   const [isProductsLoading, setIsProductsLoading] = useState(true);
 
   // Store Settings (Dynamic UPI ID, QR Code, Advance payment %)
@@ -60,7 +116,9 @@ export function AppProvider({ children }) {
   const [orders, setOrders] = useState(() => {
     try {
       const savedOrders = localStorage.getItem('pixelpress_orders');
-      return savedOrders ? JSON.parse(savedOrders) : [];
+      if (!savedOrders) return [];
+      const parsed = JSON.parse(savedOrders);
+      return Array.isArray(parsed) ? parsed.map(normalizeCustomerOrder) : [];
     } catch {
       return [];
     }
@@ -88,6 +146,7 @@ export function AppProvider({ children }) {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Sync state to unified localStorage keys
   useEffect(() => {
     try {
       localStorage.setItem('pixelpress_store_settings', JSON.stringify(storeSettings));
@@ -104,50 +163,313 @@ export function AppProvider({ children }) {
     }
   }, [collections]);
 
-  // Fetch Store Settings & Collections from database
-  const fetchStoreSettings = useCallback(async () => {
-    if (!isSupabaseConfigured || !supabase) return;
+  useEffect(() => {
     try {
-      // 1. Settings
-      const { data: sData } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category', '__STORE_SETTINGS__')
-        .limit(1);
+      localStorage.setItem('pixelpress_products', JSON.stringify(products));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [products]);
 
-      if (sData && sData.length > 0) {
-        const s = sData[0];
-        setStoreSettings({
-          upiId: s.badge || DEFAULT_STORE_SETTINGS.upiId,
-          upiQrUrl: s.image_url || '',
-          defaultAdvancePercent: s.original_price || DEFAULT_STORE_SETTINGS.defaultAdvancePercent,
-          minAdvanceAmount: s.price || DEFAULT_STORE_SETTINGS.minAdvanceAmount,
-          storeName: s.name || DEFAULT_STORE_SETTINGS.storeName,
-          announcementText: DEFAULT_STORE_SETTINGS.announcementText
-        });
+  useEffect(() => {
+    try {
+      localStorage.setItem('pixelpress_orders', JSON.stringify(orders));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [orders]);
+
+  // Fetch Store Settings & Collections from database / localStorage
+  const fetchStoreSettings = useCallback(async () => {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        // 1. Settings
+        const { data: sData } = await supabase
+          .from('products')
+          .select('*')
+          .eq('category', '__STORE_SETTINGS__')
+          .limit(1);
+
+        if (sData && sData.length > 0) {
+          const s = sData[0];
+          setStoreSettings({
+            upiId: s.badge || DEFAULT_STORE_SETTINGS.upiId,
+            upiQrUrl: s.image_url || '',
+            defaultAdvancePercent: s.original_price || DEFAULT_STORE_SETTINGS.defaultAdvancePercent,
+            minAdvanceAmount: s.price || DEFAULT_STORE_SETTINGS.minAdvanceAmount,
+            storeName: s.name || DEFAULT_STORE_SETTINGS.storeName,
+            announcementText: DEFAULT_STORE_SETTINGS.announcementText
+          });
+        }
+
+        // 2. Collections
+        const { data: cData } = await supabase
+          .from('products')
+          .select('*')
+          .eq('category', '__COLLECTION__')
+          .order('created_at', { ascending: true });
+
+        // Update collections accurately even if empty array
+        if (cData) {
+          setCollections(cData.map(c => ({
+            id: c.id,
+            name: c.name,
+            description: c.badge || '',
+            image: c.image_url
+          })));
+        }
+      } catch (err) {
+        console.warn('Could not fetch store settings/collections:', err.message);
       }
+    } else {
+      // Offline / local fallback
+      try {
+        const savedSettings = localStorage.getItem('pixelpress_store_settings');
+        if (savedSettings) setStoreSettings(JSON.parse(savedSettings));
 
-      // 2. Collections
-      const { data: cData } = await supabase
-        .from('products')
-        .select('*')
-        .eq('category', '__COLLECTION__')
-        .order('created_at', { ascending: true });
-
-      if (cData && cData.length > 0) {
-        setCollections(cData.map(c => ({
-          id: c.id,
-          name: c.name,
-          description: c.badge || '',
-          image: c.image_url
-        })));
+        const savedCollections = localStorage.getItem('pixelpress_collections');
+        if (savedCollections) setCollections(JSON.parse(savedCollections));
+      } catch (e) {
+        console.warn('Local storage settings load error:', e);
       }
-    } catch (err) {
-      console.warn('Could not fetch store settings/collections:', err.message);
     }
   }, []);
 
-  // Listen to Supabase Auth State (Google OAuth redirect etc.)
+  // Fetch Products from Supabase or localStorage
+  const fetchProducts = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      try {
+        const saved = localStorage.getItem('pixelpress_products');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setProducts(parsed.filter(p => p.isInStock !== false && p.is_active !== false));
+            setIsProductsLoading(false);
+            return;
+          }
+        }
+        setProducts(mockProducts);
+      } catch {
+        setProducts(mockProducts);
+      } finally {
+        setIsProductsLoading(false);
+      }
+      return;
+    }
+
+    try {
+      setIsProductsLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('is_active', true)
+        .neq('category', '__STORE_SETTINGS__')
+        .neq('category', '__COLLECTION__')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (data) {
+        const mapped = data.map(p => {
+          let badge = p.badge || '';
+          let isPinned = false;
+          let advanceType = 'default';
+          let advanceValue = 0;
+
+          if (badge) {
+            const parts = badge.split('|');
+            if (parts.includes('pinned')) isPinned = true;
+            const advPart = parts.find(part => part.startsWith('adv:'));
+            if (advPart) {
+              const [, type, val] = advPart.split(':');
+              advanceType = type || 'default';
+              advanceValue = Number(val) || 0;
+            }
+            badge = parts.filter(part => !part.startsWith('adv:') && part !== 'pinned').join('|');
+          }
+
+          return {
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            originalPrice: p.original_price,
+            badge: badge || null,
+            image: p.image_url,
+            category: p.category || 'Wall Setups',
+            isPinned,
+            advanceType: p.advance_type || advanceType,
+            advanceValue: p.advance_value || advanceValue
+          };
+        });
+        setProducts(mapped);
+      }
+    } catch (err) {
+      console.warn('Error fetching products:', err.message);
+      try {
+        const saved = localStorage.getItem('pixelpress_products');
+        setProducts(saved ? JSON.parse(saved) : mockProducts);
+      } catch {
+        setProducts(mockProducts);
+      }
+    } finally {
+      setIsProductsLoading(false);
+    }
+  }, []);
+
+  // Fetch Orders for currently logged-in user
+  const fetchOrders = useCallback(async () => {
+    if (!user || !user.phone) {
+      setOrders([]);
+      return;
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('customer_phone', user.phone)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        if (data) {
+          setOrders(data.map(normalizeCustomerOrder));
+        }
+      } catch (err) {
+        console.warn('Error fetching orders from Supabase:', err.message);
+        try {
+          const saved = localStorage.getItem('pixelpress_orders');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            setOrders(parsed.filter(o => o.customer_phone === user.phone || o.customerPhone === user.phone).map(normalizeCustomerOrder));
+          }
+        } catch {}
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      try {
+        const saved = localStorage.getItem('pixelpress_orders');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setOrders(parsed.filter(o => o.customer_phone === user.phone || o.customerPhone === user.phone).map(normalizeCustomerOrder));
+        }
+      } catch {}
+    }
+  }, [user]);
+
+  // Initial load
+  useEffect(() => {
+    fetchProducts();
+    fetchStoreSettings();
+  }, [fetchProducts, fetchStoreSettings]);
+
+  // Initial user orders fetch
+  useEffect(() => {
+    if (user && user.phone) {
+      fetchOrders();
+    }
+  }, [user, fetchOrders]);
+
+  // Cross-Tab Broadcast Channel Sync
+  useEffect(() => {
+    let channel = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        channel = new BroadcastChannel('pixelpress_sync_channel');
+        channel.onmessage = (event) => {
+          const { type } = event.data || {};
+          if (type === 'COLLECTIONS_CHANGED' || type === 'SETTINGS_CHANGED' || type === 'REFRESH_ALL') {
+            fetchStoreSettings();
+          }
+          if (type === 'PRODUCTS_CHANGED' || type === 'REFRESH_ALL') {
+            fetchProducts();
+          }
+          if (type === 'ORDERS_CHANGED' || type === 'REFRESH_ALL') {
+            fetchOrders();
+          }
+        };
+      }
+    } catch (err) {
+      console.warn('BroadcastChannel error:', err);
+    }
+
+    const handleStorageChange = (e) => {
+      if (e.key === 'pixelpress_collections' || e.key === 'pixelpress_store_settings') {
+        fetchStoreSettings();
+      } else if (e.key === 'pixelpress_products') {
+        fetchProducts();
+      } else if (e.key === 'pixelpress_orders') {
+        fetchOrders();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [fetchStoreSettings, fetchProducts, fetchOrders]);
+
+  // Realtime Supabase Subscription on Products & Collections
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const channel = supabase
+      .channel('public:products:customer_app')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          // Whenever ANY change (insert, update, delete) happens on products table, refresh both
+          fetchStoreSettings();
+          fetchProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchProducts, fetchStoreSettings]);
+
+  // Realtime Supabase Subscription on Orders
+  useEffect(() => {
+    if (!user || !user.phone || !isSupabaseConfigured || !supabase) return;
+
+    const channel = supabase
+      .channel('public:orders:customer_app')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `customer_phone=eq.${user.phone}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newO = normalizeCustomerOrder(payload.new);
+            setOrders(prev => [newO, ...prev.filter(item => item.id !== newO.id)]);
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = normalizeCustomerOrder(payload.new);
+            setOrders(prev =>
+              prev.map(item => item.id === updated.id ? { ...item, ...updated } : item)
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setOrders(prev => prev.filter(item => item.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  // Listen to Supabase Auth State
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) {
       setAuthLoading(false);
@@ -221,232 +543,6 @@ export function AppProvider({ children }) {
       console.error(e);
     }
   }, [cart, user]);
-
-  // Sync orders to localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem('pixelpress_orders', JSON.stringify(orders));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [orders]);
-
-  // Fetch Products from Supabase (Strictly active store products)
-  const fetchProducts = useCallback(async () => {
-    if (!isSupabaseConfigured || !supabase) {
-      setIsProductsLoading(false);
-      return;
-    }
-
-    try {
-      setIsProductsLoading(true);
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('is_active', true)
-        .neq('category', '__STORE_SETTINGS__')
-        .neq('category', '__COLLECTION__')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (data) {
-        const mapped = data.map(p => {
-          let badge = p.badge || '';
-          let isPinned = false;
-          let advanceType = 'default';
-          let advanceValue = 0;
-
-          if (badge) {
-            const parts = badge.split('|');
-            if (parts.includes('pinned')) isPinned = true;
-            const advPart = parts.find(part => part.startsWith('adv:'));
-            if (advPart) {
-              const [, type, val] = advPart.split(':');
-              advanceType = type || 'default';
-              advanceValue = Number(val) || 0;
-            }
-            badge = parts.filter(part => !part.startsWith('adv:') && part !== 'pinned').join('|');
-          }
-
-          return {
-            id: p.id,
-            name: p.name,
-            price: p.price,
-            originalPrice: p.original_price,
-            badge: badge || null,
-            image: p.image_url,
-            category: p.category || 'Wall Setups',
-            isPinned,
-            advanceType: p.advance_type || advanceType,
-            advanceValue: p.advance_value || advanceValue
-          };
-        });
-        setProducts(mapped);
-      }
-    } catch (err) {
-      console.warn('Error fetching products:', err.message);
-      setProducts([]);
-    } finally {
-      setIsProductsLoading(false);
-    }
-  }, []);
-
-  // Fetch Orders for currently logged-in user
-  const fetchOrders = useCallback(async () => {
-    if (!user || !user.phone || !isSupabaseConfigured || !supabase) return;
-
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('customer_phone', user.phone)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      if (data) {
-        const mappedOrders = data.map(o => {
-          let parsedNotes = {};
-          if (o.notes) {
-            try {
-              parsedNotes = typeof o.notes === 'string' ? JSON.parse(o.notes) : o.notes;
-            } catch {
-              parsedNotes = { rawNotes: o.notes };
-            }
-          }
-          return {
-            id: o.id,
-            product: {
-              name: o.product_name,
-              price: o.product_price,
-              image: o.product_image
-            },
-            quantity: o.quantity,
-            totalAmount: o.total_amount || (o.product_price * o.quantity),
-            status: o.status,
-            date: o.created_at,
-            campusLocation: parsedNotes.campusLocation || parsedNotes.hostelOrDept || 'Campus',
-            deliverySlot: parsedNotes.deliverySlot || 'Next-Day Delivery',
-            notes: o.notes,
-            paymentScreenshotUrl: parsedNotes.paymentScreenshotUrl || o.payment_screenshot_url,
-            advanceAmount: parsedNotes.advanceAmount || null,
-            customer_name: o.customer_name,
-            customer_phone: o.customer_phone
-          };
-        });
-        setOrders(mappedOrders);
-      }
-    } catch (err) {
-      console.warn('Error fetching orders from Supabase:', err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
-
-  // Initial load
-  useEffect(() => {
-    fetchProducts();
-    fetchStoreSettings();
-  }, [fetchProducts, fetchStoreSettings]);
-
-  // Initial user orders fetch
-  useEffect(() => {
-    if (user && user.phone && isSupabaseConfigured) {
-      fetchOrders();
-    }
-  }, [user, fetchOrders]);
-
-  // Realtime Subscription on Products & Collections
-  useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
-
-    const channel = supabase
-      .channel('public:products:customer')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
-        (payload) => {
-          if (payload.new && (payload.new.category === '__STORE_SETTINGS__' || payload.new.category === '__COLLECTION__')) {
-            fetchStoreSettings();
-          } else {
-            fetchProducts();
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchProducts, fetchStoreSettings]);
-
-  // Realtime Subscription on Orders
-  useEffect(() => {
-    if (!user || !user.phone || !isSupabaseConfigured || !supabase) return;
-
-    const channel = supabase
-      .channel('public:orders:customer')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-          filter: `customer_phone=eq.${user.phone}`
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newO = payload.new;
-            let parsedNotes = {};
-            if (newO.notes) {
-              try { parsedNotes = JSON.parse(newO.notes); } catch {}
-            }
-            setOrders(prev => [
-              {
-                id: newO.id,
-                product: {
-                  name: newO.product_name,
-                  price: newO.product_price,
-                  image: newO.product_image
-                },
-                quantity: newO.quantity,
-                totalAmount: newO.total_amount,
-                status: newO.status,
-                date: newO.created_at,
-                campusLocation: parsedNotes.campusLocation || 'Campus',
-                deliverySlot: parsedNotes.deliverySlot || 'Next-Day Delivery',
-                notes: newO.notes,
-                paymentScreenshotUrl: parsedNotes.paymentScreenshotUrl || newO.payment_screenshot_url,
-                advanceAmount: parsedNotes.advanceAmount || null,
-                customer_name: newO.customer_name,
-                customer_phone: newO.customer_phone
-              },
-              ...prev.filter(item => item.id !== newO.id)
-            ]);
-          } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new;
-            setOrders(prev =>
-              prev.map(item =>
-                item.id === updated.id
-                  ? {
-                      ...item,
-                      status: updated.status,
-                      quantity: updated.quantity
-                    }
-                  : item
-              )
-            );
-          } else if (payload.eventType === 'DELETE') {
-            setOrders(prev => prev.filter(item => item.id !== payload.old.id));
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user]);
 
   // Login handler
   const login = async (name, phone, additionalInfo = {}) => {
@@ -537,7 +633,7 @@ export function AppProvider({ children }) {
     setCart([]);
   };
 
-  // Place Order function (stores Campus Location & Delivery Slot in notes JSON)
+  // Place Order function
   const placeOrder = async (
     product, 
     quantity, 
@@ -568,6 +664,8 @@ export function AppProvider({ children }) {
       customerNote: notes
     });
 
+    let newOrder;
+
     if (isSupabaseConfigured && supabase) {
       try {
         const { data, error } = await supabase
@@ -591,63 +689,62 @@ export function AppProvider({ children }) {
         if (error) throw error;
 
         if (data) {
-          const newOrder = {
-            id: data.id,
-            product,
-            quantity,
-            totalAmount,
-            status: initialStatus,
-            date: data.created_at,
-            campusLocation,
-            deliverySlot: '⚡ Next-Day Campus Delivery',
-            notes: notesPayload,
-            paymentScreenshotUrl,
-            advanceAmount,
-            customer_name: activeUser.name,
-            customer_phone: activeUser.phone
-          };
-          setOrders(prev => [newOrder, ...prev]);
-          return newOrder;
+          newOrder = normalizeCustomerOrder(data);
         }
       } catch (err) {
         console.error('Error placing order in Supabase:', err);
-        const fallbackOrder = {
-          id: Math.random().toString(36).substr(2, 9),
+        newOrder = normalizeCustomerOrder({
+          id: `ord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
           product,
           quantity,
-          totalAmount,
+          total_amount: totalAmount,
           status: initialStatus,
-          date: new Date().toISOString(),
+          created_at: new Date().toISOString(),
           campusLocation,
-          deliverySlot: '⚡ Next-Day Campus Delivery',
           notes: notesPayload,
           paymentScreenshotUrl,
           advanceAmount,
           customer_name: activeUser.name,
           customer_phone: activeUser.phone
-        };
-        setOrders(prev => [fallbackOrder, ...prev]);
-        return fallbackOrder;
+        });
       }
     } else {
-      const newOrder = {
-        id: Math.random().toString(36).substr(2, 9),
+      newOrder = normalizeCustomerOrder({
+        id: `ord_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
         product,
         quantity,
-        totalAmount,
+        total_amount: totalAmount,
         status: initialStatus,
-        date: new Date().toISOString(),
+        created_at: new Date().toISOString(),
         campusLocation,
-        deliverySlot: '⚡ Next-Day Campus Delivery',
         notes: notesPayload,
         paymentScreenshotUrl,
         advanceAmount,
         customer_name: activeUser.name,
         customer_phone: activeUser.phone
-      };
-      setOrders(prev => [newOrder, ...prev]);
-      return newOrder;
+      });
     }
+
+    // Save into local orders state & localStorage for all orders
+    setOrders(prev => [newOrder, ...prev]);
+
+    // Save into global orders storage so Seller can see it in offline / shared mode
+    try {
+      const allOrders = JSON.parse(localStorage.getItem('pixelpress_orders') || '[]');
+      const updatedOrders = [newOrder, ...allOrders.filter(o => o.id !== newOrder.id)];
+      localStorage.setItem('pixelpress_orders', JSON.stringify(updatedOrders));
+
+      // Broadcast order event
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('pixelpress_sync_channel');
+        bc.postMessage({ type: 'ORDERS_CHANGED' });
+        bc.close();
+      }
+    } catch (e) {
+      console.error('Error syncing order locally:', e);
+    }
+
+    return newOrder;
   };
 
   // Checkout Entire Cart

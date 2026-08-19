@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Edit3, Pin, Percent, EyeOff, CheckCircle } from 'lucide-react';
+import { Trash2, Edit3, Pin } from 'lucide-react';
 import { useSeller } from '../context/SellerContext';
 
 const ProductCard = ({ product, onEdit }) => {

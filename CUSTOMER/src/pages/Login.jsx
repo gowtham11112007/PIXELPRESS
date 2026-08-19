@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, ArrowRight, CheckCircle2, Phone, User as UserIcon, LogOut, Loader2, Sparkles } from 'lucide-react';
+import { ShoppingBag, ArrowRight, CheckCircle2, LogOut, Loader2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
