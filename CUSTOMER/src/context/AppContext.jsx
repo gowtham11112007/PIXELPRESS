@@ -8,9 +8,17 @@ const DEFAULT_STORE_SETTINGS = {
   upiQrUrl: '',
   defaultAdvancePercent: 20,
   minAdvanceAmount: 100,
-  storeName: 'PIXELPRESS',
-  announcementText: '✦ FREE DELIVERY FOR PREPAID ORDERS ✦ SPLIT POSTERS ✦ CUSTOM PRINTS'
+  storeName: 'PixelPress Campus',
+  announcementText: '⚡ NEXT-DAY HOSTEL DELIVERY ✦ ORDER BEFORE 9 PM FOR TOMORROW DELIVERY ✦ FREE CAMPUS DELIVERY'
 };
+
+const DEFAULT_COLLECTIONS = [
+  { id: 'col-1', name: 'Wall Setups', description: 'Multi-frame room aesthetic sets', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=400&h=500' },
+  { id: 'col-2', name: 'Split Posters', description: '2, 3 & 4 piece split wall art', image: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&q=80&w=400&h=500' },
+  { id: 'col-3', name: 'Anime & Gym', description: 'High motivation workout & anime prints', image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=400&h=500' },
+  { id: 'col-4', name: 'Pins & Stickers', description: 'Laminated stickers, pins & badges', image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&q=80&w=400&h=500' },
+  { id: 'col-5', name: 'Custom Prints', description: 'Print your own photos & fan art', image: 'https://images.unsplash.com/photo-1508269720743-346d0a799015?auto=format&fit=crop&q=80&w=400&h=500' }
+];
 
 export function AppProvider({ children }) {
   // 1. User State (persisted in localStorage + synced to Supabase)
@@ -26,8 +34,16 @@ export function AppProvider({ children }) {
   const [supabaseUser, setSupabaseUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
-  // Products start empty - loaded strictly from DB/Admin
+  // Products & Collections
   const [products, setProducts] = useState([]);
+  const [collections, setCollections] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pixelpress_collections');
+      return saved ? JSON.parse(saved) : DEFAULT_COLLECTIONS;
+    } catch {
+      return DEFAULT_COLLECTIONS;
+    }
+  });
   const [isProductsLoading, setIsProductsLoading] = useState(true);
 
   // Store Settings (Dynamic UPI ID, QR Code, Advance payment %)
@@ -50,7 +66,7 @@ export function AppProvider({ children }) {
     }
   });
 
-  // 3. Persistent Cart State (remembered per user or guest)
+  // 3. Persistent Cart State
   const [cart, setCart] = useState(() => {
     try {
       const cartKey = user?.phone ? `pixelpress_cart_${user.phone}` : 'pixelpress_cart_guest';
@@ -72,7 +88,6 @@ export function AppProvider({ children }) {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Sync settings to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('pixelpress_store_settings', JSON.stringify(storeSettings));
@@ -81,19 +96,27 @@ export function AppProvider({ children }) {
     }
   }, [storeSettings]);
 
-  // Fetch Store Settings from database
+  useEffect(() => {
+    try {
+      localStorage.setItem('pixelpress_collections', JSON.stringify(collections));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [collections]);
+
+  // Fetch Store Settings & Collections from database
   const fetchStoreSettings = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) return;
     try {
-      const { data, error } = await supabase
+      // 1. Settings
+      const { data: sData } = await supabase
         .from('products')
         .select('*')
         .eq('category', '__STORE_SETTINGS__')
         .limit(1);
 
-      if (error) throw error;
-      if (data && data.length > 0) {
-        const s = data[0];
+      if (sData && sData.length > 0) {
+        const s = sData[0];
         setStoreSettings({
           upiId: s.badge || DEFAULT_STORE_SETTINGS.upiId,
           upiQrUrl: s.image_url || '',
@@ -103,8 +126,24 @@ export function AppProvider({ children }) {
           announcementText: DEFAULT_STORE_SETTINGS.announcementText
         });
       }
+
+      // 2. Collections
+      const { data: cData } = await supabase
+        .from('products')
+        .select('*')
+        .eq('category', '__COLLECTION__')
+        .order('created_at', { ascending: true });
+
+      if (cData && cData.length > 0) {
+        setCollections(cData.map(c => ({
+          id: c.id,
+          name: c.name,
+          description: c.badge || '',
+          image: c.image_url
+        })));
+      }
     } catch (err) {
-      console.warn('Could not fetch store settings:', err.message);
+      console.warn('Could not fetch store settings/collections:', err.message);
     }
   }, []);
 
@@ -128,7 +167,7 @@ export function AppProvider({ children }) {
             };
           }
           return {
-            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'Customer',
+            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'Student',
             phone: session.user.phone || '',
             email: session.user.email || '',
             avatar: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || null,
@@ -143,7 +182,7 @@ export function AppProvider({ children }) {
       if (session?.user) {
         setSupabaseUser(session.user);
         setUser(prev => ({
-          name: prev?.name || session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'Customer',
+          name: prev?.name || session.user.user_metadata?.full_name || session.user.user_metadata?.name || 'Student',
           phone: prev?.phone || session.user.phone || '',
           email: session.user.email || prev?.email || '',
           avatar: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || prev?.avatar || null,
@@ -169,17 +208,17 @@ export function AppProvider({ children }) {
         localStorage.removeItem('pixelpress_user');
       }
     } catch (e) {
-      console.error('Error writing user to localStorage:', e);
+      console.error(e);
     }
   }, [user]);
 
-  // Sync cart to localStorage whenever it changes
+  // Sync cart to localStorage
   useEffect(() => {
     try {
       const cartKey = user?.phone ? `pixelpress_cart_${user.phone}` : 'pixelpress_cart_guest';
       localStorage.setItem(cartKey, JSON.stringify(cart));
     } catch (e) {
-      console.error('Error writing cart to localStorage:', e);
+      console.error(e);
     }
   }, [cart, user]);
 
@@ -188,11 +227,11 @@ export function AppProvider({ children }) {
     try {
       localStorage.setItem('pixelpress_orders', JSON.stringify(orders));
     } catch (e) {
-      console.error('Error writing orders to localStorage:', e);
+      console.error(e);
     }
   }, [orders]);
 
-  // 1. Fetch Products from Supabase (Strictly active store products)
+  // Fetch Products from Supabase (Strictly active store products)
   const fetchProducts = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) {
       setIsProductsLoading(false);
@@ -206,21 +245,42 @@ export function AppProvider({ children }) {
         .select('*')
         .eq('is_active', true)
         .neq('category', '__STORE_SETTINGS__')
+        .neq('category', '__COLLECTION__')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       if (data) {
-        const mapped = data.map(p => ({
-          id: p.id,
-          name: p.name,
-          price: p.price,
-          originalPrice: p.original_price,
-          badge: p.badge,
-          image: p.image_url,
-          category: p.category || 'Wall Setups',
-          advanceType: p.advance_type || 'default',
-          advanceValue: p.advance_value || 0
-        }));
+        const mapped = data.map(p => {
+          let badge = p.badge || '';
+          let isPinned = false;
+          let advanceType = 'default';
+          let advanceValue = 0;
+
+          if (badge) {
+            const parts = badge.split('|');
+            if (parts.includes('pinned')) isPinned = true;
+            const advPart = parts.find(part => part.startsWith('adv:'));
+            if (advPart) {
+              const [, type, val] = advPart.split(':');
+              advanceType = type || 'default';
+              advanceValue = Number(val) || 0;
+            }
+            badge = parts.filter(part => !part.startsWith('adv:') && part !== 'pinned').join('|');
+          }
+
+          return {
+            id: p.id,
+            name: p.name,
+            price: p.price,
+            originalPrice: p.original_price,
+            badge: badge || null,
+            image: p.image_url,
+            category: p.category || 'Wall Setups',
+            isPinned,
+            advanceType: p.advance_type || advanceType,
+            advanceValue: p.advance_value || advanceValue
+          };
+        });
         setProducts(mapped);
       }
     } catch (err) {
@@ -231,7 +291,7 @@ export function AppProvider({ children }) {
     }
   }, []);
 
-  // 2. Fetch Orders for currently logged-in user
+  // Fetch Orders for currently logged-in user
   const fetchOrders = useCallback(async () => {
     if (!user || !user.phone || !isSupabaseConfigured || !supabase) return;
 
@@ -265,6 +325,8 @@ export function AppProvider({ children }) {
             totalAmount: o.total_amount || (o.product_price * o.quantity),
             status: o.status,
             date: o.created_at,
+            campusLocation: parsedNotes.campusLocation || parsedNotes.hostelOrDept || 'Campus',
+            deliverySlot: parsedNotes.deliverySlot || 'Next-Day Delivery',
             notes: o.notes,
             paymentScreenshotUrl: parsedNotes.paymentScreenshotUrl || o.payment_screenshot_url,
             advanceAmount: parsedNotes.advanceAmount || null,
@@ -294,7 +356,7 @@ export function AppProvider({ children }) {
     }
   }, [user, fetchOrders]);
 
-  // 3. Realtime Subscription on Products (catalog & settings)
+  // Realtime Subscription on Products & Collections
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
 
@@ -304,7 +366,7 @@ export function AppProvider({ children }) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'products' },
         (payload) => {
-          if (payload.new && payload.new.category === '__STORE_SETTINGS__') {
+          if (payload.new && (payload.new.category === '__STORE_SETTINGS__' || payload.new.category === '__COLLECTION__')) {
             fetchStoreSettings();
           } else {
             fetchProducts();
@@ -318,7 +380,7 @@ export function AppProvider({ children }) {
     };
   }, [fetchProducts, fetchStoreSettings]);
 
-  // 4. Realtime Subscription on Orders (Live updates when seller accepts/rejects)
+  // Realtime Subscription on Orders
   useEffect(() => {
     if (!user || !user.phone || !isSupabaseConfigured || !supabase) return;
 
@@ -351,6 +413,8 @@ export function AppProvider({ children }) {
                 totalAmount: newO.total_amount,
                 status: newO.status,
                 date: newO.created_at,
+                campusLocation: parsedNotes.campusLocation || 'Campus',
+                deliverySlot: parsedNotes.deliverySlot || 'Next-Day Delivery',
                 notes: newO.notes,
                 paymentScreenshotUrl: parsedNotes.paymentScreenshotUrl || newO.payment_screenshot_url,
                 advanceAmount: parsedNotes.advanceAmount || null,
@@ -406,7 +470,6 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Google OAuth Login
   const loginWithGoogle = async () => {
     if (!isSupabaseConfigured || !supabase) {
       showToast('Google login requires active cloud connection', 'info');
@@ -415,9 +478,7 @@ export function AppProvider({ children }) {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
+        options: { redirectTo: window.location.origin }
       });
       if (error) throw error;
     } catch (err) {
@@ -476,11 +537,19 @@ export function AppProvider({ children }) {
     setCart([]);
   };
 
-  // Place Order function (handles single product or multiple cart items)
-  const placeOrder = async (product, quantity, customerInfo = null, notes = '', paymentScreenshotUrl = null, advanceAmount = 0) => {
+  // Place Order function (stores Campus Location & Delivery Slot in notes JSON)
+  const placeOrder = async (
+    product, 
+    quantity, 
+    customerInfo = null, 
+    notes = '', 
+    paymentScreenshotUrl = null, 
+    advanceAmount = 0,
+    campusLocation = 'Hostel Delivery'
+  ) => {
     const activeUser = customerInfo || user;
     if (!activeUser || !activeUser.name || !activeUser.phone) {
-      throw new Error('Customer Name and Phone Number are required to place an order.');
+      throw new Error('Name and Phone Number are required.');
     }
 
     if (!user && customerInfo) {
@@ -490,10 +559,11 @@ export function AppProvider({ children }) {
     const totalAmount = product.price * quantity;
     const initialStatus = paymentScreenshotUrl ? 'Pending Payment Review' : 'Pending';
 
-    // Store metadata in JSON notes
     const notesPayload = JSON.stringify({
       paymentScreenshotUrl,
       advanceAmount,
+      campusLocation: campusLocation || 'Hostel Delivery',
+      deliverySlot: '⚡ Next-Day Campus Delivery',
       upiId: storeSettings.upiId,
       customerNote: notes
     });
@@ -528,6 +598,8 @@ export function AppProvider({ children }) {
             totalAmount,
             status: initialStatus,
             date: data.created_at,
+            campusLocation,
+            deliverySlot: '⚡ Next-Day Campus Delivery',
             notes: notesPayload,
             paymentScreenshotUrl,
             advanceAmount,
@@ -546,6 +618,8 @@ export function AppProvider({ children }) {
           totalAmount,
           status: initialStatus,
           date: new Date().toISOString(),
+          campusLocation,
+          deliverySlot: '⚡ Next-Day Campus Delivery',
           notes: notesPayload,
           paymentScreenshotUrl,
           advanceAmount,
@@ -563,6 +637,8 @@ export function AppProvider({ children }) {
         totalAmount,
         status: initialStatus,
         date: new Date().toISOString(),
+        campusLocation,
+        deliverySlot: '⚡ Next-Day Campus Delivery',
         notes: notesPayload,
         paymentScreenshotUrl,
         advanceAmount,
@@ -574,16 +650,16 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Checkout Entire Cart at once
-  const checkoutCart = async (customerInfo = null, paymentScreenshotUrl = null, calculatedAdvance = 0) => {
+  // Checkout Entire Cart
+  const checkoutCart = async (customerInfo = null, paymentScreenshotUrl = null, calculatedAdvance = 0, campusLocation = '') => {
     const activeUser = customerInfo || user;
     if (!activeUser || !activeUser.name || !activeUser.phone) {
-      throw new Error('Customer Name and Phone Number are required.');
+      throw new Error('Name and Phone Number are required.');
     }
     if (cart.length === 0) return;
 
     for (const item of cart) {
-      await placeOrder(item.product, item.quantity, activeUser, '', paymentScreenshotUrl, calculatedAdvance);
+      await placeOrder(item.product, item.quantity, activeUser, '', paymentScreenshotUrl, calculatedAdvance, campusLocation);
     }
     clearCart();
   };
@@ -600,6 +676,7 @@ export function AppProvider({ children }) {
         loginWithGoogle,
         logout,
         products,
+        collections,
         isProductsLoading,
         orders,
         cart,

@@ -8,8 +8,17 @@ import Toast from './components/Toast';
 
 // PrivateRoute component to protect routes
 function PrivateRoute({ children }) {
-  const { user } = useAppContext();
-  return user ? children : <Navigate to="/login" />;
+  const { user, authLoading } = useAppContext();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return user && user.phone ? children : <Navigate to="/login" replace />;
 }
 
 function App() {

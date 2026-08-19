@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSeller } from '../context/SellerContext';
-import { CheckCircle, XCircle, Clock, Calendar, Image as ImageIcon, X, CreditCard } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, Calendar, Image as ImageIcon, X, MapPin, MessageCircle, Truck, Printer } from 'lucide-react';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -14,21 +14,27 @@ const OrderCard = ({ order }) => {
     setTimeout(() => {
       updateOrderStatus(order.id, status);
       setIsProcessing(false);
-      showToast(`Order marked as ${status}`);
-    }, 300);
+      showToast(`Order status: ${status}`);
+    }, 250);
   };
 
   const statusStyles = {
     'Pending': 'bg-amber-50 text-amber-700 border-amber-200',
     'Pending Payment Review': 'bg-yellow-100 text-yellow-800 border-yellow-300 font-bold',
-    'Accepted': 'bg-green-50 text-green-700 border-green-200',
+    'Printing': 'bg-blue-50 text-blue-700 border-blue-200 font-bold',
+    'Accepted': 'bg-blue-50 text-blue-700 border-blue-200 font-bold',
+    'Out for Delivery': 'bg-purple-50 text-purple-700 border-purple-200 font-bold',
+    'Delivered': 'bg-emerald-50 text-emerald-700 border-emerald-200 font-bold',
     'Rejected': 'bg-red-50 text-red-700 border-red-200',
   };
 
   const StatusIcon = {
     'Pending': Clock,
     'Pending Payment Review': Clock,
-    'Accepted': CheckCircle,
+    'Printing': Printer,
+    'Accepted': Printer,
+    'Out for Delivery': Truck,
+    'Delivered': CheckCircle,
     'Rejected': XCircle,
   }[order.status] || Clock;
 
@@ -37,36 +43,53 @@ const OrderCard = ({ order }) => {
   const dateString = date.toLocaleDateString();
 
   const isPendingReview = order.status === 'Pending Payment Review';
-  const isPending = order.status === 'Pending' || isPendingReview;
-
   const total = order.totalAmount || (order.productPrice * order.quantity) || 0;
   const advance = order.advanceAmount || Math.round(total * 0.2);
   const balance = Math.max(0, total - advance);
+
+  const handleWhatsAppDeliveryAlert = () => {
+    const text = encodeURIComponent(
+      `Hi ${order.customerName}! 🚀 Your PixelPress poster order #${order.id.slice(0, 6).toUpperCase()} for "${order.productName}" is OUT FOR CAMPUS DELIVERY to ${order.campusLocation || 'your hostel/room'}!\n\n💰 COD Balance to pay: ₹${balance}\n📦 Delivery Slot: Next-Day Campus Delivery\n\nPlease be ready at your room/pickup spot.`
+    );
+    window.open(`https://wa.me/${(order.customerPhone || '').replace(/\D/g, '')}?text=${text}`, '_blank');
+  };
 
   return (
     <>
       <div className={clsx(
         "card p-5 transition-all duration-200 flex flex-col justify-between", 
         isPendingReview ? 'border-yellow-400 shadow-md ring-2 ring-yellow-400 animate-pulse' : 
-        order.status === 'Pending' ? 'border-brand-300 shadow-md ring-1 ring-brand-50' : ''
+        order.status === 'Out for Delivery' ? 'border-purple-300 shadow-md ring-1 ring-purple-100' : ''
       )}>
         <div>
-          <div className="flex justify-between items-start mb-4">
+          {/* Header */}
+          <div className="flex justify-between items-start mb-3">
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-slate-900">{order.customerName}</h3>
-                {isPending && (
-                   <span className="bg-brand-100 text-brand-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                     New
+              <div className="flex items-center gap-2 mb-0.5">
+                <h3 className="font-bold text-slate-900 text-base">{order.customerName}</h3>
+                {isPendingReview && (
+                   <span className="bg-yellow-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                     Review Proof
                    </span>
                 )}
               </div>
-              <p className="text-sm text-slate-500 font-medium">{order.customerPhone}</p>
+              <p className="text-xs text-slate-500 font-medium">{order.customerPhone}</p>
             </div>
-            <div className={clsx("px-3 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5", statusStyles[order.status])}>
-              <StatusIcon size={14} />
+            <div className={clsx("px-2.5 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5", statusStyles[order.status] || statusStyles['Pending'])}>
+              <StatusIcon size={13} />
               {order.status}
             </div>
+          </div>
+
+          {/* Campus Delivery Location Pill */}
+          <div className="mb-3 bg-brand-50/80 border border-brand-200 rounded-lg px-3 py-2 flex items-center justify-between text-xs">
+            <span className="text-brand-900 font-bold flex items-center gap-1.5 truncate">
+              <MapPin className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+              <span className="truncate">{order.campusLocation || 'Campus Delivery'}</span>
+            </span>
+            <span className="text-[10px] font-bold text-brand-600 bg-white px-2 py-0.5 rounded border border-brand-200 uppercase tracking-wider shrink-0 ml-2">
+              Next-Day
+            </span>
           </div>
 
           {/* Product Details */}
@@ -76,64 +99,105 @@ const OrderCard = ({ order }) => {
               <p className="font-bold text-slate-900 text-sm truncate">{order.productName}</p>
               <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
                 <span>Qty: <strong className="text-slate-800">{order.quantity}</strong></span>
-                <span className="font-extrabold text-slate-900 text-sm">₹{total}</span>
+                <span className="font-black text-slate-900 text-sm">Total: ₹{total}</span>
               </div>
             </div>
           </div>
 
-          {/* Advance & Balance Breakdown */}
+          {/* Advance & COD Balance Breakdown */}
           <div className="grid grid-cols-2 gap-2 mb-3 text-xs bg-slate-100/70 p-2.5 rounded-lg border border-slate-200/60">
             <div>
-              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Advance Paid (Proof)</span>
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Advance Paid</span>
               <span className="font-bold text-emerald-700">₹{advance}</span>
             </div>
             <div>
-              <span className="text-[10px] text-slate-500 uppercase font-semibold block">Balance Due on Delivery</span>
-              <span className="font-bold text-slate-800">₹{balance}</span>
+              <span className="text-[10px] text-slate-500 uppercase font-semibold block">COD Balance</span>
+              <span className="font-bold text-amber-700">₹{balance}</span>
             </div>
           </div>
 
-          {/* Proof of Payment Screenshot Button */}
+          {/* Payment Proof Button */}
           {order.paymentScreenshotUrl && (
             <div className="mb-4 bg-blue-50/80 border border-blue-200 rounded-xl p-2.5 flex justify-between items-center">
-              <div className="flex items-center gap-2 text-xs text-blue-900 font-semibold">
-                <ImageIcon size={16} className="text-blue-600" />
+              <div className="flex items-center gap-2 text-xs text-blue-900 font-bold">
+                <ImageIcon size={15} className="text-blue-600" />
                 Payment Proof Uploaded
               </div>
               <button 
                 onClick={() => setShowScreenshotModal(true)}
                 className="text-xs bg-white text-blue-700 border border-blue-300 px-3 py-1.5 rounded-lg hover:bg-blue-50 font-bold shadow-xs transition-colors"
               >
-                View Screenshot
+                View Proof
               </button>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between mt-auto pt-2 border-t border-slate-100">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
-            <Calendar size={13} />
-            <span>{dateString} • {timeString}</span>
+        {/* Action Controls */}
+        <div className="space-y-2 pt-2 border-t border-slate-100 mt-auto">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium">
+            <div className="flex items-center gap-1">
+              <Calendar size={12} />
+              <span>{dateString} • {timeString}</span>
+            </div>
+
+            {order.status !== 'Delivered' && order.status !== 'Rejected' && (
+              <button
+                onClick={handleWhatsAppDeliveryAlert}
+                className="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1 hover:underline"
+              >
+                <MessageCircle size={13} /> WhatsApp Student
+              </button>
+            )}
           </div>
 
-          {isPending && (
-            <div className="flex gap-2">
+          {/* Stage Progression Buttons */}
+          <div className="flex gap-2 pt-1">
+            {isPendingReview && (
+              <>
+                <button 
+                  disabled={isProcessing}
+                  onClick={() => handleStatusChange('Rejected')}
+                  className="btn-danger py-1.5 px-3 text-xs font-semibold flex items-center gap-1"
+                >
+                  <XCircle size={14} /> Reject
+                </button>
+                <button 
+                  disabled={isProcessing}
+                  onClick={() => handleStatusChange('Printing')}
+                  className="btn-success flex-1 py-1.5 px-3 text-xs font-bold flex items-center justify-center gap-1 shadow-sm"
+                >
+                  <CheckCircle size={14} /> Verify & Start Printing
+                </button>
+              </>
+            )}
+
+            {(order.status === 'Printing' || order.status === 'Accepted') && (
               <button 
                 disabled={isProcessing}
-                onClick={() => handleStatusChange('Rejected')}
-                className="btn-danger py-1.5 px-3 text-xs font-semibold flex items-center gap-1"
+                onClick={() => handleStatusChange('Out for Delivery')}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
               >
-                <XCircle size={14} /> Reject
+                <Truck size={14} /> Dispatch for Campus Delivery
               </button>
+            )}
+
+            {order.status === 'Out for Delivery' && (
               <button 
                 disabled={isProcessing}
-                onClick={() => handleStatusChange('Accepted')}
-                className="btn-success py-1.5 px-3 text-xs font-bold flex items-center gap-1 shadow-sm"
+                onClick={() => handleStatusChange('Delivered')}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
               >
-                <CheckCircle size={14} /> {isPendingReview ? 'Verify & Accept' : 'Accept'}
+                <CheckCircle size={14} /> Mark Delivered & COD Received (₹{balance})
               </button>
-            </div>
-          )}
+            )}
+
+            {order.status === 'Delivered' && (
+              <div className="w-full text-center text-xs font-bold text-emerald-700 bg-emerald-50 py-1.5 rounded-lg border border-emerald-200">
+                ✓ Completed & Delivered to Room
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -157,7 +221,7 @@ const OrderCard = ({ order }) => {
               <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                 <h3 className="font-bold text-gray-900 flex items-center gap-2 text-sm">
                   <ImageIcon size={18} className="text-brand-600" /> 
-                  Customer Payment Proof — {order.customerName}
+                  Payment Proof — {order.customerName} ({order.campusLocation})
                 </h3>
                 <button onClick={() => setShowScreenshotModal(false)} className="p-1 hover:bg-gray-200 rounded-full">
                   <X size={18} />
@@ -172,7 +236,7 @@ const OrderCard = ({ order }) => {
               </div>
               <div className="p-4 bg-white border-t border-gray-100 flex justify-between items-center">
                 <div className="text-xs">
-                  <span className="text-gray-500 block">Verified Advance Amount:</span>
+                  <span className="text-gray-500 block">Verified Advance:</span>
                   <span className="font-bold text-gray-900 text-sm">₹{advance}</span>
                 </div>
                 <div className="flex gap-2">
@@ -182,12 +246,12 @@ const OrderCard = ({ order }) => {
                   {isPendingReview && (
                     <button 
                       onClick={() => {
-                        handleStatusChange('Accepted');
+                        handleStatusChange('Printing');
                         setShowScreenshotModal(false);
                       }} 
                       className="btn-success py-2 px-4 text-xs font-bold flex items-center gap-1.5 shadow-md"
                     >
-                      <CheckCircle size={15} /> Verify & Accept
+                      <CheckCircle size={15} /> Verify & Start Printing
                     </button>
                   )}
                 </div>

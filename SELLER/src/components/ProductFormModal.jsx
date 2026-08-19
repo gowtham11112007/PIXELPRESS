@@ -1,23 +1,11 @@
-import React, { useState } from 'react';
-import { X, Upload, Percent, Sparkles } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Upload, Percent, Sparkles, Pin, CheckCircle } from 'lucide-react';
 import { useSeller } from '../context/SellerContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { compressImage } from '../lib/imageUtils';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
-const CATEGORIES = [
-  'Wall Setups',
-  'Split Posters',
-  'Motivation',
-  'Cars & Motors',
-  'Minimal',
-  'Custom Prints',
-  'Apparel',
-  'Accessories'
-];
-
-const ProductFormModal = ({ isOpen, onClose }) => {
-  const { addProduct, storeSettings } = useSeller();
+const ProductFormModal = ({ isOpen, onClose, editingProduct = null }) => {
+  const { addProduct, updateProduct, collections, storeSettings } = useSeller();
   
   const [formData, setFormData] = useState({
     name: '',
@@ -26,30 +14,60 @@ const ProductFormModal = ({ isOpen, onClose }) => {
     category: 'Wall Setups',
     badge: '',
     image: '',
-    advanceType: 'default', // 'default' | 'percentage' | 'fixed' | 'zero'
-    advanceValue: ''
+    advanceType: 'default',
+    advanceValue: '',
+    isPinned: false,
+    isInStock: true
   });
 
-  const [imageInputMode, setImageInputMode] = useState('upload'); // 'upload' | 'url'
-  const [imageBlob, setImageBlob] = useState(null);
+  const [imageInputMode, setImageInputMode] = useState('upload');
   const [preview, setPreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
+
+  // Sync form data if editing
+  useEffect(() => {
+    if (editingProduct) {
+      setFormData({
+        name: editingProduct.name || '',
+        price: editingProduct.price || '',
+        originalPrice: editingProduct.originalPrice || '',
+        category: editingProduct.category || 'Wall Setups',
+        badge: editingProduct.badge || '',
+        image: editingProduct.image || '',
+        advanceType: editingProduct.advanceType || 'default',
+        advanceValue: editingProduct.advanceValue || '',
+        isPinned: Boolean(editingProduct.isPinned),
+        isInStock: editingProduct.isInStock !== false
+      });
+      setPreview(editingProduct.image || null);
+    } else {
+      setFormData({
+        name: '',
+        price: '',
+        originalPrice: '',
+        category: collections[0]?.name || 'Wall Setups',
+        badge: '',
+        image: '',
+        advanceType: 'default',
+        advanceValue: '',
+        isPinned: false,
+        isInStock: true
+      });
+      setPreview(null);
+    }
+  }, [editingProduct, isOpen, collections]);
 
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setError('');
       try {
         const compressed = await compressImage(file, 800, 1000, 0.8);
         setPreview(compressed.dataUrl);
-        setImageBlob(compressed.blob || file);
         setFormData(prev => ({ ...prev, image: compressed.dataUrl }));
       } catch (err) {
         console.error('Image compression error:', err);
         const url = URL.createObjectURL(file);
         setPreview(url);
-        setImageBlob(file);
         setFormData(prev => ({ ...prev, image: url }));
       }
     }
@@ -57,84 +75,40 @@ const ProductFormModal = ({ isOpen, onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
-    if (!formData.name.trim()) {
-      setError('Please enter a product name.');
-      return;
-    }
-    if (!formData.price || parseFloat(formData.price) <= 0) {
-      setError('Please enter a valid price.');
-      return;
-    }
-    if (!formData.image && !imageBlob) {
-      setError('Please upload an image or provide an image URL.');
-      return;
-    }
+    if (!formData.name || !formData.price || !formData.image) return;
 
     try {
       setIsSubmitting(true);
-      let finalImageUrl = formData.image;
-
-      // Try uploading to Supabase Storage if file is present
-      if (imageBlob && isSupabaseConfigured && supabase) {
-        try {
-          const fileExt = imageBlob.type ? imageBlob.type.split('/')[1] : 'jpg';
-          const fileName = `prod_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-          const filePath = `products/${fileName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('product_images')
-            .upload(filePath, imageBlob, {
-              cacheControl: '3600',
-              upsert: false
-            });
-
-          if (!uploadError) {
-            const { data: publicUrlData } = supabase.storage
-              .from('product_images')
-              .getPublicUrl(filePath);
-
-            if (publicUrlData?.publicUrl) {
-              finalImageUrl = publicUrlData.publicUrl;
-            }
-          }
-        } catch (storageErr) {
-          console.warn('Storage upload fallback to base64:', storageErr.message);
-        }
-      }
-
-      await addProduct({
+      const payload = {
         name: formData.name.trim(),
         price: parseFloat(formData.price),
         originalPrice: formData.originalPrice ? parseFloat(formData.originalPrice) : null,
         category: formData.category,
         badge: formData.badge.trim() || null,
-        image: finalImageUrl,
+        image: formData.image,
         advanceType: formData.advanceType,
-        advanceValue: formData.advanceValue ? parseFloat(formData.advanceValue) : 0
-      });
+        advanceValue: formData.advanceValue ? parseFloat(formData.advanceValue) : 0,
+        isPinned: formData.isPinned,
+        isInStock: formData.isInStock
+      };
 
-      // Reset form
-      setFormData({
-        name: '',
-        price: '',
-        originalPrice: '',
-        category: 'Wall Setups',
-        badge: '',
-        image: '',
-        advanceType: 'default',
-        advanceValue: ''
-      });
-      setPreview(null);
-      setImageBlob(null);
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, payload);
+      } else {
+        await addProduct(payload);
+      }
+
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to add product.');
+      console.error(err);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const categoryOptions = collections.length > 0 
+    ? collections.map(c => c.name) 
+    : ['Wall Setups', 'Split Posters', 'Anime & Gym', 'Pins & Stickers', 'Custom Prints'];
 
   return (
     <AnimatePresence>
@@ -154,9 +128,9 @@ const ProductFormModal = ({ isOpen, onClose }) => {
             className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-2xl z-50 overflow-hidden max-h-[92vh] flex flex-col"
           >
             <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
-              <h2 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+              <h2 className="font-bold text-base text-slate-900 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-brand-600" />
-                Add New Product
+                {editingProduct ? `Edit Product: ${editingProduct.name}` : 'Add New Item / Poster'}
               </h2>
               <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
                 <X size={18} />
@@ -164,11 +138,11 @@ const ProductFormModal = ({ isOpen, onClose }) => {
             </div>
             
             <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
-              {/* Image Input Section */}
+              {/* Image Input */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Product Image *
+                    Product Photo *
                   </label>
                   <div className="flex gap-2 text-xs">
                     <button
@@ -176,7 +150,7 @@ const ProductFormModal = ({ isOpen, onClose }) => {
                       onClick={() => setImageInputMode('upload')}
                       className={`font-semibold ${imageInputMode === 'upload' ? 'text-brand-600 underline' : 'text-slate-400'}`}
                     >
-                      File Upload
+                      Upload File
                     </button>
                     <span className="text-slate-300">|</span>
                     <button
@@ -184,7 +158,7 @@ const ProductFormModal = ({ isOpen, onClose }) => {
                       onClick={() => setImageInputMode('url')}
                       className={`font-semibold ${imageInputMode === 'url' ? 'text-brand-600 underline' : 'text-slate-400'}`}
                     >
-                      Paste Image URL
+                      Image URL
                     </button>
                   </div>
                 </div>
@@ -195,14 +169,14 @@ const ProductFormModal = ({ isOpen, onClose }) => {
                       <>
                         <img src={preview} alt="Preview" className="w-24 h-24 object-cover rounded-lg shadow-sm" />
                         <div className="ml-4 text-left">
-                          <p className="text-xs font-bold text-slate-800">Image Loaded</p>
-                          <p className="text-[11px] text-brand-600 font-semibold mt-0.5">Click or drag to change</p>
+                          <p className="text-xs font-bold text-slate-800">Photo Loaded</p>
+                          <p className="text-[11px] text-brand-600 font-semibold mt-0.5">Click to replace photo</p>
                         </div>
                       </>
                     ) : (
                       <div className="space-y-1">
                         <Upload className="mx-auto h-7 w-7 text-slate-400" />
-                        <p className="text-xs font-bold text-slate-700">Click to upload product photo</p>
+                        <p className="text-xs font-bold text-slate-700">Click to upload poster/merch photo</p>
                         <p className="text-[10px] text-slate-400">PNG, JPG, WebP supported</p>
                       </div>
                     )}
@@ -221,12 +195,6 @@ const ProductFormModal = ({ isOpen, onClose }) => {
                       className="input-field text-xs"
                       required
                     />
-                    {preview && (
-                      <div className="mt-2 flex items-center gap-3 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                        <img src={preview} alt="Preview" className="w-12 h-12 object-cover rounded" />
-                        <span className="text-xs text-slate-600 truncate">Image URL preview</span>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -234,12 +202,12 @@ const ProductFormModal = ({ isOpen, onClose }) => {
               {/* Product Name */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Product Name *
+                  Item Title *
                 </label>
                 <input 
                   type="text" 
                   className="input-field text-sm" 
-                  placeholder="e.g. Porsche 911 GT3 Split Wall Set"
+                  placeholder="e.g. Iron Man 3-Piece Split Wall Poster"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   required
@@ -250,14 +218,14 @@ const ProductFormModal = ({ isOpen, onClose }) => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Category *
+                    Collection / Category *
                   </label>
                   <select
                     value={formData.category}
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
                     className="input-field text-xs bg-white"
                   >
-                    {CATEGORIES.map(cat => (
+                    {categoryOptions.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -265,12 +233,12 @@ const ProductFormModal = ({ isOpen, onClose }) => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Badge (Optional)
+                    Badge / Tag (Optional)
                   </label>
                   <input 
                     type="text" 
                     className="input-field text-xs" 
-                    placeholder="e.g. BEST SELLER, NEW, SALE"
+                    placeholder="e.g. BEST SELLER, HOT, NEW"
                     value={formData.badge}
                     onChange={(e) => setFormData({...formData, badge: e.target.value})}
                   />
@@ -290,7 +258,7 @@ const ProductFormModal = ({ isOpen, onClose }) => {
                       min="0"
                       step="1"
                       className="input-field pl-7 text-sm font-bold" 
-                      placeholder="599"
+                      placeholder="499"
                       value={formData.price}
                       onChange={(e) => setFormData({...formData, price: e.target.value})}
                       required
@@ -309,7 +277,7 @@ const ProductFormModal = ({ isOpen, onClose }) => {
                       min="0"
                       step="1"
                       className="input-field pl-7 text-sm" 
-                      placeholder="899"
+                      placeholder="799"
                       value={formData.originalPrice}
                       onChange={(e) => setFormData({...formData, originalPrice: e.target.value})}
                     />
@@ -317,7 +285,7 @@ const ProductFormModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              {/* Advance Payment Configuration for this product */}
+              {/* Advance Payment Configuration */}
               <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 space-y-2.5">
                 <div className="flex justify-between items-center">
                   <label className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
@@ -368,19 +336,48 @@ const ProductFormModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
 
-              {error && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 font-medium">
-                  {error}
-                </div>
-              )}
+              {/* Pin to Top & Stock Status */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={formData.isPinned}
+                    onChange={(e) => setFormData({ ...formData, isPinned: e.target.checked })}
+                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <Pin className="w-3.5 h-3.5 text-amber-500" />
+                      Pin to Top
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">Feature at top of store</span>
+                  </div>
+                </label>
 
-              {/* Modal Buttons */}
-              <div className="pt-2 flex gap-3">
-                <button type="button" onClick={onClose} className="btn-secondary flex-1 py-2.5">
+                <label className="flex items-center gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={formData.isInStock}
+                    onChange={(e) => setFormData({ ...formData, isInStock: e.target.checked })}
+                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                      In Stock
+                    </span>
+                    <span className="text-[10px] text-slate-400 block">Available for students</span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Submit / Action Buttons */}
+              <div className="pt-3 flex gap-3">
+                <button type="button" onClick={onClose} className="btn-secondary flex-1 py-2.5 text-xs font-semibold">
                   Cancel
                 </button>
-                <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 py-2.5 shadow-md">
-                  {isSubmitting ? 'Saving Product...' : 'Publish Product'}
+                <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 py-2.5 shadow-md text-xs font-bold">
+                  {isSubmitting ? 'Saving...' : editingProduct ? 'Save Product Changes' : 'Publish to Store'}
                 </button>
               </div>
             </form>

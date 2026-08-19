@@ -10,25 +10,45 @@ const DEFAULT_STORE_SETTINGS = {
   upiQrUrl: '',
   defaultAdvancePercent: 20,
   minAdvanceAmount: 100,
-  storeName: 'PIXELPRESS',
-  announcementText: '✦ FREE DELIVERY FOR PREPAID ORDERS ✦ SPLIT POSTERS ✦ CUSTOM PRINTS'
+  storeName: 'PixelPress Campus',
+  announcementText: '⚡ NEXT-DAY HOSTEL DELIVERY ✦ ORDER BEFORE 9 PM FOR TOMORROW DELIVERY ✦ FREE CAMPUS DELIVERY',
+  cutoffTime: '21:00', // 9 PM cutoff for next-day delivery
+  campusLocations: ['Hostel Block A', 'Hostel Block B', 'Hostel Block C', 'Girls Hostel 1', 'Girls Hostel 2', 'Mechanical Dept', 'CSE Dept', 'Main Canteen Pickup']
 };
 
-// Helper: encode and decode custom advance options within product badge safely
+const DEFAULT_COLLECTIONS = [
+  { id: 'col-1', name: 'Wall Setups', description: 'Multi-frame room aesthetic sets', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?auto=format&fit=crop&q=80&w=400&h=500' },
+  { id: 'col-2', name: 'Split Posters', description: '2, 3 & 4 piece split wall art', image: 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?auto=format&fit=crop&q=80&w=400&h=500' },
+  { id: 'col-3', name: 'Anime & Gym', description: 'High motivation workout & anime prints', image: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&q=80&w=400&h=500' },
+  { id: 'col-4', name: 'Pins & Stickers', description: 'Laminated stickers, pins & badges', image: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&q=80&w=400&h=500' },
+  { id: 'col-5', name: 'Custom Prints', description: 'Print your own photos & fan art', image: 'https://images.unsplash.com/photo-1508269720743-346d0a799015?auto=format&fit=crop&q=80&w=400&h=500' }
+];
+
+// Helper: parse product metadata safely
 export function parseProductMetadata(p) {
   let badge = p.badge || '';
   let advanceType = 'default';
   let advanceValue = 0;
+  let isPinned = false;
 
-  if (badge && badge.includes('adv:')) {
+  if (badge) {
     const parts = badge.split('|');
+    
+    // Check if pinned
+    if (parts.includes('pinned')) {
+      isPinned = true;
+    }
+
+    // Check advance
     const advPart = parts.find(part => part.startsWith('adv:'));
     if (advPart) {
       const [, type, val] = advPart.split(':');
       advanceType = type || 'default';
       advanceValue = Number(val) || 0;
     }
-    badge = parts.filter(part => !part.startsWith('adv:')).join('|');
+
+    // Clean remaining badge text for display
+    badge = parts.filter(part => !part.startsWith('adv:') && part !== 'pinned').join('|');
   }
 
   return {
@@ -39,18 +59,30 @@ export function parseProductMetadata(p) {
     badge: badge || null,
     image: p.image_url,
     category: p.category || 'Wall Setups',
+    isPinned,
+    isInStock: p.is_active !== false,
     advanceType: p.advance_type || advanceType,
-    advanceValue: p.advance_value || advanceValue
+    advanceValue: p.advance_value || advanceValue,
+    createdAt: p.created_at
   };
 }
 
 export const SellerProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('seller_user');
-    return saved ? JSON.parse(saved) : { name: 'Admin Seller', phone: '+91 9876543210' };
+    return saved ? JSON.parse(saved) : { name: 'Campus Admin', phone: '+91 9876543210' };
   });
 
   const [products, setProducts] = useState([]);
+  const [collections, setCollections] = useState(() => {
+    try {
+      const saved = localStorage.getItem('seller_collections');
+      return saved ? JSON.parse(saved) : DEFAULT_COLLECTIONS;
+    } catch {
+      return DEFAULT_COLLECTIONS;
+    }
+  });
+
   const [orders, setOrders] = useState([]);
   const [isProductsLoading, setIsProductsLoading] = useState(true);
   
@@ -78,30 +110,50 @@ export const SellerProvider = ({ children }) => {
     localStorage.setItem('seller_store_settings', JSON.stringify(storeSettings));
   }, [storeSettings]);
 
-  // Fetch Store Settings
+  useEffect(() => {
+    localStorage.setItem('seller_collections', JSON.stringify(collections));
+  }, [collections]);
+
+  // Fetch Store Settings & Collections from Supabase
   const fetchStoreSettings = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) return;
     try {
-      const { data, error } = await supabase
+      // 1. Settings
+      const { data: sData } = await supabase
         .from('products')
         .select('*')
         .eq('category', '__STORE_SETTINGS__')
         .limit(1);
 
-      if (error) throw error;
-      if (data && data.length > 0) {
-        const s = data[0];
-        setStoreSettings({
+      if (sData && sData.length > 0) {
+        const s = sData[0];
+        setStoreSettings(prev => ({
+          ...prev,
           upiId: s.badge || DEFAULT_STORE_SETTINGS.upiId,
           upiQrUrl: s.image_url || '',
           defaultAdvancePercent: s.original_price || DEFAULT_STORE_SETTINGS.defaultAdvancePercent,
           minAdvanceAmount: s.price || DEFAULT_STORE_SETTINGS.minAdvanceAmount,
           storeName: s.name || DEFAULT_STORE_SETTINGS.storeName,
-          announcementText: DEFAULT_STORE_SETTINGS.announcementText
-        });
+        }));
+      }
+
+      // 2. Collections
+      const { data: cData } = await supabase
+        .from('products')
+        .select('*')
+        .eq('category', '__COLLECTION__')
+        .order('created_at', { ascending: true });
+
+      if (cData && cData.length > 0) {
+        setCollections(cData.map(c => ({
+          id: c.id,
+          name: c.name,
+          description: c.badge || '',
+          image: c.image_url
+        })));
       }
     } catch (err) {
-      console.warn('Error fetching settings in seller:', err.message);
+      console.warn('Error fetching settings/collections in seller:', err.message);
     }
   }, []);
 
@@ -113,7 +165,7 @@ export const SellerProvider = ({ children }) => {
     if (isSupabaseConfigured && supabase) {
       try {
         const settingsPayload = {
-          name: merged.storeName || 'PIXELPRESS',
+          name: merged.storeName || 'PixelPress Campus',
           category: '__STORE_SETTINGS__',
           badge: merged.upiId || 'pixelpress@upi',
           image_url: merged.upiQrUrl || '',
@@ -139,7 +191,7 @@ export const SellerProvider = ({ children }) => {
             .insert([settingsPayload]);
         }
 
-        showToast('Store settings updated and synced!');
+        showToast('Store & delivery settings updated!');
       } catch (err) {
         console.error('Error saving store settings:', err);
         showToast('Failed to save settings to cloud.', 'error');
@@ -149,6 +201,76 @@ export const SellerProvider = ({ children }) => {
     }
   };
 
+  // Collections Management Methods
+  const addCollection = async (collection) => {
+    const newCol = {
+      name: collection.name.trim(),
+      category: '__COLLECTION__',
+      badge: collection.description || '',
+      image_url: collection.image,
+      is_active: false
+    };
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .insert([newCol])
+          .select()
+          .single();
+
+        if (error) throw error;
+        setCollections(prev => [...prev, {
+          id: data.id,
+          name: data.name,
+          description: data.badge || '',
+          image: data.image_url
+        }]);
+        showToast('Collection created!');
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to create collection.', 'error');
+      }
+    } else {
+      const local = { ...collection, id: `col-${Date.now()}` };
+      setCollections(prev => [...prev, local]);
+      showToast('Collection created locally');
+    }
+  };
+
+  const updateCollection = async (id, updated) => {
+    setCollections(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase
+          .from('products')
+          .update({
+            name: updated.name,
+            badge: updated.description || '',
+            image_url: updated.image
+          })
+          .eq('id', id);
+        showToast('Collection updated!');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const deleteCollection = async (id) => {
+    setCollections(prev => prev.filter(c => c.id !== id));
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await supabase.from('products').delete().eq('id', id);
+        showToast('Collection removed!');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  // Products Management
   const fetchProducts = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) {
       setIsProductsLoading(false);
@@ -159,8 +281,8 @@ export const SellerProvider = ({ children }) => {
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .eq('is_active', true)
         .neq('category', '__STORE_SETTINGS__')
+        .neq('category', '__COLLECTION__')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -204,6 +326,8 @@ export const SellerProvider = ({ children }) => {
             totalAmount: o.total_amount || (o.product_price * o.quantity),
             status: o.status,
             timestamp: o.created_at,
+            campusLocation: parsedNotes.campusLocation || parsedNotes.hostelOrDept || 'Campus',
+            deliverySlot: parsedNotes.deliverySlot || 'Next-Day Delivery',
             paymentScreenshotUrl: parsedNotes.paymentScreenshotUrl || o.payment_screenshot_url,
             advanceAmount: parsedNotes.advanceAmount || null,
             customerNote: parsedNotes.customerNote || o.notes
@@ -245,11 +369,13 @@ export const SellerProvider = ({ children }) => {
               totalAmount: o.total_amount || (o.product_price * o.quantity),
               status: o.status,
               timestamp: o.created_at,
+              campusLocation: parsedNotes.campusLocation || parsedNotes.hostelOrDept || 'Campus',
+              deliverySlot: parsedNotes.deliverySlot || 'Next-Day Delivery',
               paymentScreenshotUrl: parsedNotes.paymentScreenshotUrl || o.payment_screenshot_url,
               advanceAmount: parsedNotes.advanceAmount || null,
               customerNote: parsedNotes.customerNote || o.notes
             }, ...prev.filter(item => item.id !== o.id)]);
-            showToast(`New incoming order from ${o.customer_name}!`, 'info');
+            showToast(`New Campus Order from ${o.customer_name} (${parsedNotes.campusLocation || 'Campus'})!`, 'info');
           } else if (payload.eventType === 'UPDATE') {
             const updated = payload.new;
             setOrders(prev => prev.map(order => 
@@ -270,9 +396,12 @@ export const SellerProvider = ({ children }) => {
   const login = (name, phone) => setUser({ name, phone });
   const logout = () => setUser(null);
 
+  // Add Product
   const addProduct = async (product) => {
-    // Construct badge with embedded advance settings if not default
     let badgeString = product.badge || '';
+    if (product.isPinned) {
+      badgeString = badgeString ? `${badgeString}|pinned` : 'pinned';
+    }
     if (product.advanceType && product.advanceType !== 'default') {
       badgeString = badgeString ? `${badgeString}|adv:${product.advanceType}:${product.advanceValue || 0}` : `adv:${product.advanceType}:${product.advanceValue || 0}`;
     }
@@ -282,7 +411,7 @@ export const SellerProvider = ({ children }) => {
         const { data, error } = await supabase
           .from('products')
           .insert([{
-            name: product.name.trim(),
+            name: product.name,
             price: Number(product.price),
             original_price: product.originalPrice ? Number(product.originalPrice) : null,
             badge: badgeString || null,
@@ -295,44 +424,99 @@ export const SellerProvider = ({ children }) => {
           
         if (error) throw error;
         
-        const newProd = parseProductMetadata(data);
-        setProducts(prev => [newProd, ...prev]);
-        showToast('Product added successfully!');
-        return newProd;
+        setProducts(prev => [parseProductMetadata(data), ...prev]);
+        showToast('Item published to campus store!');
+        return data;
       } catch (err) {
         console.error('Error adding product to Supabase:', err);
-        showToast(err.message || 'Failed to add product.', 'error');
+        showToast('Failed to add product.', 'error');
         throw err;
       }
     } else {
-      const newProduct = { ...product, id: Date.now().toString() };
+      const newProduct = { ...product, id: Date.now().toString(), isInStock: true };
       setProducts((prev) => [newProduct, ...prev]);
-      showToast('Product added locally (demo mode)');
+      showToast('Item added locally');
       return newProduct;
     }
+  };
+
+  // Edit / Update Product
+  const updateProduct = async (id, updated) => {
+    let badgeString = updated.badge || '';
+    if (updated.isPinned) {
+      badgeString = badgeString ? `${badgeString}|pinned` : 'pinned';
+    }
+    if (updated.advanceType && updated.advanceType !== 'default') {
+      badgeString = badgeString ? `${badgeString}|adv:${updated.advanceType}:${updated.advanceValue || 0}` : `adv:${updated.advanceType}:${updated.advanceValue || 0}`;
+    }
+
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updated, badge: updated.badge || null, isPinned: Boolean(updated.isPinned) } : p));
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('products')
+          .update({
+            name: updated.name,
+            price: Number(updated.price),
+            original_price: updated.originalPrice ? Number(updated.originalPrice) : null,
+            badge: badgeString || null,
+            image_url: updated.image,
+            category: updated.category || 'Wall Setups',
+            is_active: updated.isInStock !== false
+          })
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (error) throw error;
+        showToast('Product updated successfully!');
+      } catch (err) {
+        console.error('Error updating product:', err);
+        showToast('Failed to update product', 'error');
+      }
+    }
+  };
+
+  // Toggle Pin Status (Feature at top of store)
+  const togglePinProduct = async (id) => {
+    const target = products.find(p => p.id === id);
+    if (!target) return;
+    const newPinned = !target.isPinned;
+    await updateProduct(id, { ...target, isPinned: newPinned });
+    showToast(newPinned ? 'Item pinned to top of store!' : 'Item unpinned');
+  };
+
+  // Toggle Stock Status
+  const toggleStockProduct = async (id) => {
+    const target = products.find(p => p.id === id);
+    if (!target) return;
+    const newStock = !target.isInStock;
+    await updateProduct(id, { ...target, isInStock: newStock });
+    showToast(newStock ? 'Marked In Stock' : 'Marked Out of Stock');
   };
 
   const deleteProduct = async (id) => {
     if (isSupabaseConfigured && supabase) {
       try {
-        const { error } = await supabase
+        await supabase
           .from('products')
-          .update({ is_active: false })
+          .delete()
           .eq('id', id);
           
-        if (error) throw error;
         setProducts((prev) => prev.filter(p => p.id !== id));
-        showToast('Product removed!');
+        showToast('Item deleted from store!');
       } catch (err) {
         console.error('Error deleting product from Supabase:', err);
-        showToast(err.message || 'Failed to remove product.', 'error');
+        showToast('Failed to remove product.', 'error');
       }
     } else {
       setProducts((prev) => prev.filter(p => p.id !== id));
-      showToast('Product removed locally');
+      showToast('Item removed locally');
     }
   };
 
+  // Order status update (Next-day delivery workflow)
   const updateOrderStatus = async (orderId, newStatus) => {
     if (isSupabaseConfigured && supabase) {
       try {
@@ -362,7 +546,7 @@ export const SellerProvider = ({ children }) => {
   const pendingOrdersCount = orders.filter(o => o.status === 'Pending' || o.status === 'Pending Payment Review').length;
   
   const acceptedTodayCount = orders.filter(o => {
-    if (o.status !== 'Accepted') return false;
+    if (o.status !== 'Accepted' && o.status !== 'Printing' && o.status !== 'Out for Delivery' && o.status !== 'Delivered') return false;
     const orderDate = new Date(o.timestamp);
     const today = new Date();
     return orderDate.toDateString() === today.toDateString();
@@ -374,11 +558,18 @@ export const SellerProvider = ({ children }) => {
         user,
         products,
         isProductsLoading,
+        collections,
         orders,
         login,
         logout,
         addProduct,
+        updateProduct,
+        togglePinProduct,
+        toggleStockProduct,
         deleteProduct,
+        addCollection,
+        updateCollection,
+        deleteCollection,
         updateOrderStatus,
         pendingOrdersCount,
         acceptedTodayCount,
@@ -387,7 +578,8 @@ export const SellerProvider = ({ children }) => {
         storeSettings,
         updateStoreSettings,
         fetchProducts,
-        fetchOrders
+        fetchOrders,
+        fetchStoreSettings
       }}
     >
       {children}

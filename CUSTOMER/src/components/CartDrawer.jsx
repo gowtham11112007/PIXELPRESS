@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, UploadCloud, CheckCircle, Copy, ExternalLink } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, UploadCloud, CheckCircle, Copy, ExternalLink, MapPin, Truck, Zap } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
@@ -22,6 +22,7 @@ export default function CartDrawer() {
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [campusLocation, setCampusLocation] = useState('');
   
   // Checkout flow state
   const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
@@ -96,7 +97,7 @@ export default function CartDrawer() {
   const handleCopyUpi = () => {
     navigator.clipboard.writeText(storeSettings.upiId);
     setCopiedUpi(true);
-    showToast('UPI ID copied to clipboard!');
+    showToast('UPI ID copied!');
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
@@ -106,13 +107,18 @@ export default function CartDrawer() {
 
     const customerName = (user?.name || name).trim();
     const customerPhone = (user?.phone || phone).trim();
+    const loc = campusLocation.trim();
 
     if (!customerName) {
-      setError('Please enter your full name');
+      setError('Please enter your name');
       return;
     }
     if (!customerPhone.match(/^\d{10}$/)) {
       setError('Please enter a valid 10-digit phone number');
+      return;
+    }
+    if (!loc) {
+      setError('Please enter your Hostel Name & Room No (or Dept)');
       return;
     }
     
@@ -151,7 +157,7 @@ export default function CartDrawer() {
       
       let finalScreenshotUrl = null;
 
-      // 1. Compress image to high-efficiency WebP/JPEG
+      // 1. Compress image
       let compressed;
       try {
         compressed = await compressImage(screenshotFile, 900, 900, 0.75);
@@ -161,7 +167,7 @@ export default function CartDrawer() {
 
       const uploadDataUrl = compressed?.dataUrl || screenshotPreview;
 
-      // 2. Try Supabase storage upload with graceful fallback to compressed dataUrl
+      // 2. Try Supabase storage upload with graceful fallback
       if (isSupabaseConfigured && supabase && compressed?.blob) {
         try {
           const fileName = `adv_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
@@ -177,11 +183,9 @@ export default function CartDrawer() {
               .getPublicUrl(filePath);
             finalScreenshotUrl = publicUrlData?.publicUrl || uploadDataUrl;
           } else {
-            console.warn('Storage upload error, using direct image data:', uploadError.message);
             finalScreenshotUrl = uploadDataUrl;
           }
         } catch (sErr) {
-          console.warn('Storage connection warning, using direct image data:', sErr);
           finalScreenshotUrl = uploadDataUrl;
         }
       } else {
@@ -195,15 +199,16 @@ export default function CartDrawer() {
       await checkoutCart(
         { name: customerName, phone: customerPhone }, 
         finalScreenshotUrl,
-        advanceAmount
+        advanceAmount,
+        campusLocation.trim()
       );
       
       setStep('success');
-      showToast('Order submitted successfully!');
+      showToast('Order submitted! Delivering tomorrow inside campus.');
       setTimeout(() => {
         setIsCartOpen(false);
         navigate('/orders');
-      }, 2200);
+      }, 2000);
 
     } catch (err) {
       console.error('Checkout error:', err);
@@ -215,7 +220,7 @@ export default function CartDrawer() {
   };
 
   // Dynamic QR Code URL (custom uploaded QR or generated UPI QR)
-  const upiPayDeepLink = `upi://pay?pa=${encodeURIComponent(storeSettings.upiId)}&pn=${encodeURIComponent(storeSettings.storeName)}&am=${advanceAmount}&cu=INR&tn=Advance%20Payment`;
+  const upiPayDeepLink = `upi://pay?pa=${encodeURIComponent(storeSettings.upiId)}&pn=${encodeURIComponent(storeSettings.storeName)}&am=${advanceAmount}&cu=INR&tn=Campus%20Advance`;
   const dynamicQrCodeUrl = storeSettings.upiQrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiPayDeepLink)}`;
 
   return (
@@ -243,10 +248,10 @@ export default function CartDrawer() {
             <div className="p-4 sm:p-5 border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <ShoppingBag className="w-5 h-5 text-black" />
-                <h2 className="text-lg font-bold text-black tracking-tight">
-                  {step === 'cart' && `Your Cart (${cart.length})`}
-                  {step === 'payment' && 'Advance Payment'}
-                  {step === 'success' && 'Order Placed'}
+                <h2 className="text-base font-bold text-black tracking-tight">
+                  {step === 'cart' && `Your Bag (${cart.length})`}
+                  {step === 'payment' && 'Verify Advance Payment'}
+                  {step === 'success' && 'Order Received'}
                 </h2>
               </div>
               <button
@@ -257,6 +262,12 @@ export default function CartDrawer() {
               </button>
             </div>
 
+            {/* Next-Day Campus Delivery Promise Banner */}
+            <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-black flex items-center justify-center gap-1.5 shadow-xs uppercase tracking-wider">
+              <Zap className="w-3.5 h-3.5 fill-slate-950" />
+              <span>Next-Day Campus Room & Dept Delivery</span>
+            </div>
+
             {/* Content */}
             {step === 'success' ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
@@ -264,34 +275,34 @@ export default function CartDrawer() {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', bounce: 0.5 }}
-                  className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center"
+                  className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center"
                 >
-                  <CheckCircle className="w-10 h-10 text-green-600" />
+                  <CheckCircle className="w-9 h-9 text-emerald-600" />
                 </motion.div>
-                <h3 className="text-xl font-bold text-gray-900">Payment Submitted!</h3>
-                <p className="text-gray-500 text-sm">
-                  Your order has been sent for payment review. Redirecting you to My Orders...
+                <h3 className="text-xl font-black text-gray-900">Order Placed!</h3>
+                <p className="text-gray-600 text-xs leading-relaxed max-w-xs">
+                  Your order is sent for payment verification. We will print your items and deliver them <strong>tomorrow to {campusLocation || 'your hostel/room'}</strong>!
                 </p>
               </div>
             ) : step === 'payment' ? (
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col items-center space-y-5">
-                <div className="text-center space-y-2 w-full">
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    Please pay the advance amount below to confirm your order. The remaining balance (₹{totalAmount - advanceAmount}) will be paid on delivery.
-                  </p>
-                  <div className="bg-gradient-to-br from-gray-900 to-black text-white p-4 rounded-xl shadow-sm">
-                    <p className="text-[11px] uppercase tracking-widest text-gray-400 font-semibold mb-0.5">Required Advance</p>
-                    <p className="text-3xl font-black text-white">₹{advanceAmount}</p>
-                    <p className="text-xs text-gray-300 mt-1">Total Order: ₹{totalAmount}</p>
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col items-center space-y-4">
+                <div className="text-center space-y-1.5 w-full">
+                  <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-sm">
+                    <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Pay Advance Proof</p>
+                    <p className="text-3xl font-black text-amber-400">₹{advanceAmount}</p>
+                    <div className="flex justify-between text-xs text-slate-300 mt-2 pt-2 border-t border-slate-800">
+                      <span>Total: ₹{totalAmount}</span>
+                      <span className="font-bold text-amber-300">Pay on Delivery: ₹{totalAmount - advanceAmount}</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Dynamic QR Scanner & UPI Info */}
-                <div className="bg-white p-4 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center w-full shadow-sm">
+                <div className="bg-white p-3.5 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center w-full shadow-xs">
                   <img 
                     src={dynamicQrCodeUrl} 
                     alt="UPI QR Code" 
-                    className="w-44 h-44 object-contain rounded-lg shadow-sm border border-gray-100" 
+                    className="w-40 h-40 object-contain rounded-lg shadow-sm border border-gray-100" 
                   />
 
                   {/* UPI ID Pill with Copy */}
@@ -312,19 +323,19 @@ export default function CartDrawer() {
                   {/* Direct Mobile UPI Pay button */}
                   <a
                     href={upiPayDeepLink}
-                    className="mt-3 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-blue-200"
+                    className="mt-2.5 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-blue-200"
                   >
-                    <span>Pay with any UPI App</span>
+                    <span>Open Any UPI App</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
 
                 {/* Screenshot Upload Box */}
-                <div className="w-full space-y-2">
+                <div className="w-full space-y-1.5">
                   <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider">
                     Upload Payment Screenshot *
                   </label>
-                  <div className="relative border-2 border-gray-300 border-dashed rounded-xl p-5 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer overflow-hidden min-h-[120px]">
+                  <div className="relative border-2 border-gray-300 border-dashed rounded-xl p-4 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer overflow-hidden min-h-[110px]">
                     {screenshotPreview ? (
                       <>
                         <img 
@@ -332,15 +343,15 @@ export default function CartDrawer() {
                           alt="Screenshot" 
                           className="absolute inset-0 w-full h-full object-cover opacity-70" 
                         />
-                        <div className="relative z-10 bg-white/95 px-4 py-2 rounded-full shadow-md text-xs font-bold flex items-center space-x-2 text-gray-900 border border-gray-200">
+                        <div className="relative z-10 bg-white/95 px-3 py-1.5 rounded-full shadow-md text-xs font-bold flex items-center space-x-1.5 text-gray-900 border border-gray-200">
                            <span>Change Screenshot</span>
                         </div>
                       </>
                     ) : (
                       <>
-                        <UploadCloud className="w-8 h-8 text-gray-400 mb-1" />
-                        <p className="text-xs font-bold text-gray-700">Tap to upload payment screenshot</p>
-                        <p className="text-[11px] text-gray-400 mt-0.5">JPG, PNG, WebP supported</p>
+                        <UploadCloud className="w-7 h-7 text-gray-400 mb-1" />
+                        <p className="text-xs font-bold text-gray-700">Tap to upload advance proof</p>
+                        <p className="text-[10px] text-gray-400">GPay, PhonePe, Paytm screenshot</p>
                       </>
                     )}
                     <input 
@@ -358,44 +369,44 @@ export default function CartDrawer() {
                   </p>
                 )}
 
-                <div className="w-full mt-auto pt-4 border-t border-gray-100 flex gap-3">
+                <div className="w-full mt-auto pt-3 border-t border-gray-100 flex gap-2.5">
                   <button 
                     onClick={() => setStep('cart')} 
-                    className="flex-1 py-3.5 border border-gray-200 text-xs font-bold hover:bg-gray-50 transition-colors uppercase tracking-widest text-gray-600 rounded-lg"
+                    className="flex-1 py-3 border border-gray-200 text-xs font-bold hover:bg-gray-50 transition-colors uppercase tracking-widest text-gray-600 rounded-xl"
                   >
                     Back
                   </button>
                   <button 
                     onClick={handleFinalCheckout} 
                     disabled={isUploading || isOrdering || !screenshotPreview} 
-                    className="flex-[2] bg-black hover:bg-gray-800 text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors disabled:opacity-50 rounded-lg shadow-md"
+                    className="flex-[2] bg-slate-900 hover:bg-black text-white text-xs font-bold py-3 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors disabled:opacity-50 rounded-xl shadow-md"
                   >
-                    <span>{isUploading || isOrdering ? 'Submitting Order...' : 'Submit Order'}</span>
+                    <span>{isUploading || isOrdering ? 'Confirming...' : 'Place Order'}</span>
                   </button>
                 </div>
               </div>
             ) : cart.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                 <div className="text-5xl mb-3">🛍️</div>
-                <h3 className="text-base font-bold text-gray-900">Your cart is empty</h3>
-                <p className="text-gray-400 text-xs mt-1 mb-6">Explore our catalog and add your favourite items!</p>
+                <h3 className="text-base font-bold text-gray-900">Your bag is empty</h3>
+                <p className="text-gray-400 text-xs mt-1 mb-6">Explore campus posters, pins & merch!</p>
                 <button
                   onClick={() => setIsCartOpen(false)}
-                  className="bg-black text-white text-xs font-bold px-6 py-3 uppercase tracking-widest hover:bg-gray-800 transition-colors rounded-lg shadow-sm"
+                  className="bg-black text-white text-xs font-bold px-6 py-3 uppercase tracking-widest hover:bg-gray-800 transition-colors rounded-xl shadow-sm"
                 >
-                  Start Shopping
+                  Explore Catalog
                 </button>
               </div>
             ) : (
               <>
                 {/* Items List */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
                   {cart.map(item => (
-                    <div key={item.product.id} className="flex gap-3 border-b border-gray-100 pb-4">
+                    <div key={item.product.id} className="flex gap-3 border-b border-gray-100 pb-3">
                       <img
                         src={item.product.image}
                         alt={item.product.name}
-                        className="w-16 h-20 object-cover bg-gray-100 rounded-lg flex-shrink-0 border border-gray-200 shadow-sm"
+                        className="w-16 h-20 object-cover bg-gray-100 rounded-xl flex-shrink-0 border border-gray-200 shadow-xs"
                       />
                       <div className="flex-1 flex flex-col justify-between">
                         <div>
@@ -405,20 +416,14 @@ export default function CartDrawer() {
                               onClick={() => removeFromCart(item.product.id)}
                               className="text-gray-400 hover:text-red-500 transition-colors p-1"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                           <p className="text-sm font-extrabold text-gray-900 mt-0.5">₹{item.product.price}</p>
-                          {item.product.advanceType && item.product.advanceType !== 'default' && (
-                            <span className="inline-block mt-1 text-[10px] font-semibold text-brand-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              {item.product.advanceType === 'fixed' ? `₹${item.product.advanceValue} Advance` : 
-                               item.product.advanceType === 'percentage' ? `${item.product.advanceValue}% Advance` : 'Full COD'}
-                            </span>
-                          )}
                         </div>
 
                         {/* Quantity */}
-                        <div className="flex items-center space-x-2 border border-gray-200 w-max px-1.5 py-0.5 mt-2 rounded-lg bg-gray-50">
+                        <div className="flex items-center space-x-2 border border-gray-200 w-max px-1.5 py-0.5 mt-1.5 rounded-lg bg-gray-50">
                           <button
                             onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
                             className="p-1 hover:bg-gray-200 text-gray-700 rounded"
@@ -438,13 +443,14 @@ export default function CartDrawer() {
                   ))}
                 </div>
 
-                {/* Checkout Section & Customer Details */}
-                <div className="p-4 sm:p-5 border-t border-gray-200 bg-gray-50/50 space-y-4">
-                  {/* Customer Info Form */}
-                  <div className="bg-white p-3.5 border border-gray-200 rounded-xl space-y-2 shadow-sm">
-                    <p className="text-[11px] font-bold tracking-wider text-gray-500 uppercase">
-                      Ordering Customer Details:
+                {/* Campus Delivery Address & Customer Details */}
+                <div className="p-4 sm:p-5 border-t border-gray-200 bg-gray-50/70 space-y-3">
+                  <div className="bg-white p-3.5 border border-gray-200 rounded-2xl space-y-2.5 shadow-xs">
+                    <p className="text-[11px] font-bold tracking-wider text-slate-800 uppercase flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-brand-600" />
+                      Next-Day Campus Delivery Details:
                     </p>
+
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"
@@ -452,7 +458,7 @@ export default function CartDrawer() {
                         value={user?.name || name}
                         onChange={e => setName(e.target.value)}
                         disabled={Boolean(user?.name)}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 font-medium"
+                        className="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 font-medium"
                       />
                       <input
                         type="tel"
@@ -460,25 +466,34 @@ export default function CartDrawer() {
                         value={user?.phone || phone}
                         onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                         disabled={Boolean(user?.phone)}
-                        className="w-full text-xs border border-gray-300 rounded-lg p-2.5 focus:outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 font-medium"
+                        className="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 font-medium"
                       />
                     </div>
+
+                    <input
+                      type="text"
+                      placeholder="Hostel Name & Room No (e.g. Block B, Room 304 / Dept)"
+                      value={campusLocation}
+                      onChange={e => setCampusLocation(e.target.value)}
+                      className="w-full text-xs border border-brand-300 bg-brand-50/30 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold text-slate-900"
+                      required
+                    />
                   </div>
 
                   {error && (
                     <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200 font-medium">{error}</p>
                   )}
 
-                  <div className="flex justify-between items-center text-sm font-bold text-gray-900">
+                  <div className="flex justify-between items-center text-sm font-bold text-gray-900 pt-1">
                     <span>Total Amount:</span>
                     <span className="text-xl font-black">₹{totalAmount}</span>
                   </div>
 
                   <button
                     onClick={handleProceedToPayment}
-                    className="w-full bg-black hover:bg-gray-800 text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
+                    className="w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
                   >
-                    <span>Proceed to Advance Payment</span>
+                    <span>Continue to Advance Payment (₹{advanceAmount})</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

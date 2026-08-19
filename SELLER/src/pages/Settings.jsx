@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { QrCode, CreditCard, Percent, Store, Save, UploadCloud, RefreshCw, CheckCircle2, Copy } from 'lucide-react';
+import { QrCode, CreditCard, Percent, Store, Save, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useSeller } from '../context/SellerContext';
 import { compressImage } from '../lib/imageUtils';
 
