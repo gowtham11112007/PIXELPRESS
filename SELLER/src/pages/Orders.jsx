@@ -4,7 +4,7 @@ import OrderCard from '../components/OrderCard';
 import { Search, Truck, CheckCircle2, IndianRupee } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const TABS = ['All', 'Pending Review', 'Printing', 'Out for Delivery', 'Delivered', 'Rejected'];
+const TABS = ['All', 'Pending', 'Pending Review', 'Printing', 'Out for Delivery', 'Delivered', 'Rejected'];
 
 const Orders = () => {
   const { orders } = useSeller();
@@ -49,6 +49,8 @@ const Orders = () => {
       let matchesTab = true;
       if (activeTab === 'All') {
         matchesTab = true;
+      } else if (activeTab === 'Pending') {
+        matchesTab = order.status === 'Pending';
       } else if (activeTab === 'Pending Review') {
         matchesTab = order.status === 'Pending Payment Review';
       } else if (activeTab === 'Printing') {

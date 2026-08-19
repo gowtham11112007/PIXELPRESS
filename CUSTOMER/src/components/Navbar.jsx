@@ -36,7 +36,13 @@ export default function Navbar() {
 
   return (
     <>
-      <AnnouncementBar text={storeSettings?.announcementText || "⚡ LIGHTNING FAST DELIVERY"} />
+      {storeSettings?.isTemporarilyClosed ? (
+        <div className="bg-red-600 text-white text-xs font-bold tracking-widest text-center py-2 px-4 uppercase">
+          🚨 Store Temporarily Closed: {storeSettings.closedReason || 'We will be back soon!'} 🚨
+        </div>
+      ) : (
+        <AnnouncementBar text={storeSettings?.announcementText || "⚡ LIGHTNING FAST DELIVERY"} />
+      )}
       <nav className="sticky top-0 z-40 bg-white border-b border-gray-200">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-14 sm:h-16">

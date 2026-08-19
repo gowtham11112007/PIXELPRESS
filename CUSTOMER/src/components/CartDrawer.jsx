@@ -101,7 +101,7 @@ export default function CartDrawer() {
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  const handleProceedToPayment = (e) => {
+  const handlePlaceOrder = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -121,12 +121,25 @@ export default function CartDrawer() {
       setError('Please enter your Building Name & Room No (or Dept)');
       return;
     }
-    
-    if (!user) {
-      login(customerName, customerPhone);
+    try {
+      setIsOrdering(true);
+      await checkoutCart(
+        { name: customerName, phone: customerPhone },
+        null,
+        0,
+        loc
+      );
+      setStep('success');
+      showToast('Order requested! Please check My Orders for seller confirmation.');
+      setTimeout(() => {
+        setIsCartOpen(false);
+        navigate('/orders');
+      }, 2000);
+    } catch (err) {
+      setError(err.message || 'Error requesting order');
+    } finally {
+      setIsOrdering(false);
     }
-
-    setStep('payment');
   };
 
   const handleImageChange = async (e) => {
@@ -284,107 +297,6 @@ export default function CartDrawer() {
                   Your order is sent for payment verification. We will print your items and deliver them <strong>tomorrow to {campusLocation || 'your location'}</strong>!
                 </p>
               </div>
-            ) : step === 'payment' ? (
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col items-center space-y-4">
-                <div className="text-center space-y-1.5 w-full">
-                  <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-sm">
-                    <p className="text-[10px] uppercase tracking-widest text-slate-400 font-bold mb-0.5">Pay Advance Proof</p>
-                    <p className="text-3xl font-black text-amber-400">₹{advanceAmount}</p>
-                    <div className="flex justify-between text-xs text-slate-300 mt-2 pt-2 border-t border-slate-800">
-                      <span>Total: ₹{totalAmount}</span>
-                      <span className="font-bold text-amber-300">Pay on Delivery: ₹{totalAmount - advanceAmount}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Dynamic QR Scanner & UPI Info */}
-                <div className="bg-white p-3.5 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center w-full shadow-xs">
-                  <img 
-                    src={dynamicQrCodeUrl} 
-                    alt="UPI QR Code" 
-                    className="w-40 h-40 object-contain rounded-lg shadow-sm border border-gray-100" 
-                  />
-
-                  {/* UPI ID Pill with Copy */}
-                  <div className="mt-3 flex items-center gap-2 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full w-full justify-between">
-                    <span className="font-mono text-xs font-bold text-gray-800 truncate">
-                      {storeSettings.upiId}
-                    </span>
-                    <button
-                      onClick={handleCopyUpi}
-                      className="p-1 hover:bg-gray-200 rounded-full transition-colors flex items-center gap-1 text-[11px] font-semibold text-gray-700"
-                      title="Copy UPI ID"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>{copiedUpi ? 'Copied!' : 'Copy'}</span>
-                    </button>
-                  </div>
-
-                  {/* Direct Mobile UPI Pay button */}
-                  <a
-                    href={upiPayDeepLink}
-                    className="mt-2.5 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-colors border border-blue-200"
-                  >
-                    <span>Open Any UPI App</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
-                </div>
-
-                {/* Screenshot Upload Box */}
-                <div className="w-full space-y-1.5">
-                  <label className="block text-xs font-bold text-gray-900 uppercase tracking-wider">
-                    Upload Payment Screenshot *
-                  </label>
-                  <div className="relative border-2 border-gray-300 border-dashed rounded-xl p-4 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer overflow-hidden min-h-[110px]">
-                    {screenshotPreview ? (
-                      <>
-                        <img 
-                          src={screenshotPreview} 
-                          alt="Screenshot" 
-                          className="absolute inset-0 w-full h-full object-cover opacity-70" 
-                        />
-                        <div className="relative z-10 bg-white/95 px-3 py-1.5 rounded-full shadow-md text-xs font-bold flex items-center space-x-1.5 text-gray-900 border border-gray-200">
-                           <span>Change Screenshot</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <UploadCloud className="w-7 h-7 text-gray-400 mb-1" />
-                        <p className="text-xs font-bold text-gray-700">Tap to upload advance proof</p>
-                        <p className="text-[10px] text-gray-400">GPay, PhonePe, Paytm screenshot</p>
-                      </>
-                    )}
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      onChange={handleImageChange} 
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                    />
-                  </div>
-                </div>
-                
-                {error && (
-                  <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200 w-full text-center font-medium">
-                    {error}
-                  </p>
-                )}
-
-                <div className="w-full mt-auto pt-3 border-t border-gray-100 flex gap-2.5">
-                  <button 
-                    onClick={() => setStep('cart')} 
-                    className="flex-1 py-3 border border-gray-200 text-xs font-bold hover:bg-gray-50 transition-colors uppercase tracking-widest text-gray-600 rounded-xl"
-                  >
-                    Back
-                  </button>
-                  <button 
-                    onClick={handleFinalCheckout} 
-                    disabled={isUploading || isOrdering || !screenshotPreview} 
-                    className="flex-[2] bg-slate-900 hover:bg-black text-white text-xs font-bold py-3 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors disabled:opacity-50 rounded-xl shadow-md"
-                  >
-                    <span>{isUploading || isOrdering ? 'Confirming...' : 'Place Order'}</span>
-                  </button>
-                </div>
-              </div>
             ) : cart.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
                 <div className="text-5xl mb-3">🛍️</div>
@@ -490,10 +402,10 @@ export default function CartDrawer() {
                   </div>
 
                   <button
-                    onClick={handleProceedToPayment}
+                    onClick={handlePlaceOrder}
                     className="w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
                   >
-                    <span>Continue to Advance Payment (₹{advanceAmount})</span>
+                    <span>Request Order & Check Availability</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>

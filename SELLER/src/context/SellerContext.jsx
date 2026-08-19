@@ -734,10 +734,10 @@ export const SellerProvider = ({ children }) => {
   };
 
   // Order status update
-  const updateOrderStatus = async (orderId, newStatus) => {
+  const updateOrderStatus = async (orderId, newStatus, extraUpdates = {}) => {
     setOrders((prev) => {
       const updated = prev.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus } : order
+        order.id === orderId ? { ...order, status: newStatus, ...extraUpdates } : order
       );
       localStorage.setItem('pixelpress_orders', JSON.stringify(updated));
       return updated;
@@ -746,9 +746,12 @@ export const SellerProvider = ({ children }) => {
 
     if (isSupabaseConfigured && supabase) {
       try {
+        const payload = { status: newStatus };
+        if (extraUpdates.notes) payload.notes = extraUpdates.notes;
+        
         const { error } = await supabase
           .from('orders')
-          .update({ status: newStatus })
+          .update(payload)
           .eq('id', orderId);
           
         if (error) throw error;

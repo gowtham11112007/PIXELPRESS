@@ -1,17 +1,25 @@
-import React from 'react';
-import { Clock, CheckCircle2, XCircle, MessageCircle, MapPin, Truck, Printer } from 'lucide-react';
+import React, { useState } from 'react';
+import { Clock, CheckCircle2, XCircle, MessageCircle, MapPin, Truck, Printer, ImageIcon, Check, Copy, ExternalLink, X, UploadCloud } from 'lucide-react';
+import { useAppContext } from '../context/AppContext';
+import { compressImage } from '../lib/imageUtils';
 
 export default function OrderCard({ order }) {
+  const { storeSettings, isSupabaseConfigured, supabase, showToast, fetchOrders } = useAppContext();
+  const [showPaymentUI, setShowPaymentUI] = useState(false);
+  const [screenshotFile, setScreenshotFile] = useState(null);
+  const [screenshotPreview, setScreenshotPreview] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
   const isAccepted = order.status === 'Accepted' || order.status === 'Printing';
   const isOutForDelivery = order.status === 'Out for Delivery';
   const isDelivered = order.status === 'Delivered';
   const isRejected = order.status === 'Rejected';
 
   const statusConfig = {
-    'Pending':  { label: 'Pending Payment',  icon: Clock, cls: 'text-amber-600 bg-amber-50 border-amber-200' },
+    'Pending':  { label: 'Awaiting Confirmation',  icon: Clock, cls: 'text-slate-600 bg-slate-50 border-slate-200' },
     'Pending Payment Review':  { label: 'Payment Under Review', icon: Clock, cls: 'text-amber-700 bg-amber-50 border-amber-300 font-bold animate-pulse' },
-    'Printing': { label: 'Printing Your Items', icon: Printer, cls: 'text-blue-700 bg-blue-50 border-blue-200 font-bold' },
-    'Accepted': { label: 'Order Confirmed', icon: CheckCircle2, cls: 'text-blue-700 bg-blue-50 border-blue-200 font-bold' },
+    'Payment Review':  { label: 'Payment Under Review', icon: Clock, cls: 'text-amber-700 bg-amber-50 border-amber-300 font-bold animate-pulse' },
+    'Printing': { label: 'Confirmed & Printing', icon: Printer, cls: 'text-blue-700 bg-blue-50 border-blue-200 font-bold' },
+    'Accepted': { label: 'Waiting for Payment', icon: Clock, cls: 'text-amber-600 bg-amber-50 border-amber-200 font-bold animate-pulse' },
     'Out for Delivery': { label: 'Out for Campus Delivery', icon: Truck, cls: 'text-purple-700 bg-purple-50 border-purple-200 font-bold' },
     'Delivered': { label: 'Delivered to Room', icon: CheckCircle2, cls: 'text-emerald-700 bg-emerald-50 border-emerald-200 font-bold' },
     'Rejected': { label: 'Rejected', icon: XCircle, cls: 'text-red-600 bg-red-50 border-red-200' },
@@ -40,6 +48,86 @@ export default function OrderCard({ order }) {
     { label: 'Dispatched', done: isOutForDelivery || isDelivered },
     { label: 'Delivered', done: isDelivered },
   ];
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const compressed = await compressImage(file, 800, 800, 0.7);
+        setScreenshotFile(file);
+        setScreenshotPreview(compressed.dataUrl);
+      } catch (err) {
+        setScreenshotFile(file);
+        setScreenshotPreview(URL.createObjectURL(file));
+      }
+    }
+  };
+
+  const submitPaymentProof = async () => {
+    if (!screenshotFile && !screenshotPreview) {
+      showToast('Please upload a screenshot', 'error');
+      return;
+    }
+    setIsUploading(true);
+    let finalUrl = null;
+    try {
+      let compressed;
+      try { compressed = await compressImage(screenshotFile, 900, 900, 0.75); } catch(e){}
+      const uploadDataUrl = compressed?.dataUrl || screenshotPreview;
+
+      if (isSupabaseConfigured && supabase && compressed?.blob) {
+        try {
+          const fileName = `adv_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+          const filePath = `advance_payments/${fileName}`;
+          const { error } = await supabase.storage.from('payment_screenshots').upload(filePath, compressed.blob, { contentType: 'image/jpeg' });
+          if (!error) {
+            const { data } = supabase.storage.from('payment_screenshots').getPublicUrl(filePath);
+            finalUrl = data.publicUrl;
+          }
+        } catch (e) {}
+      }
+      if (!finalUrl) { finalUrl = uploadDataUrl; }
+
+      // Update order status
+      if (isSupabaseConfigured && supabase) {
+        let notesObj = {};
+        try { notesObj = JSON.parse(order.notes || '{}'); } catch(e){}
+        notesObj.paymentScreenshotUrl = finalUrl;
+        
+        await supabase.from('orders').update({
+          status: 'Payment Review',
+          notes: JSON.stringify(notesObj)
+        }).eq('id', order.id);
+        
+        await fetchOrders();
+        setShowPaymentUI(false);
+        showToast('Payment proof submitted!');
+      } else {
+        // Local fallback
+        let notesObj = {};
+        try { notesObj = JSON.parse(order.notes || '{}'); } catch(e){}
+        notesObj.paymentScreenshotUrl = finalUrl;
+        order.notes = JSON.stringify(notesObj);
+        order.status = 'Payment Review';
+        const all = JSON.parse(localStorage.getItem('pixelpress_orders') || '[]');
+        const updated = all.map(o => o.id === order.id ? order : o);
+        localStorage.setItem('pixelpress_orders', JSON.stringify(updated));
+        await fetchOrders();
+        setShowPaymentUI(false);
+        showToast('Payment proof submitted locally!');
+      }
+    } catch(err) {
+      showToast('Error uploading proof', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  let sellerComment = '';
+  try {
+    const notesObj = JSON.parse(order.notes || '{}');
+    sellerComment = notesObj.sellerComment;
+  } catch(e) {}
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
@@ -86,14 +174,63 @@ export default function OrderCard({ order }) {
             {/* Advance & Balance Details */}
             <div className="mt-3 flex gap-3 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
               <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Advance Paid</span>
-                <span className="font-bold text-emerald-700">₹{advance}</span>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">{order.status === 'Pending' || order.status === 'Accepted' ? 'Advance To Pay' : 'Advance Paid'}</span>
+                <span className={`font-bold ${order.status === 'Pending' || order.status === 'Accepted' ? 'text-amber-600' : 'text-emerald-700'}`}>₹{advance}</span>
               </div>
               <div className="border-l border-slate-200 pl-3">
                 <span className="text-slate-400 block text-[10px] uppercase font-semibold">Pay on Delivery (COD)</span>
                 <span className="font-bold text-amber-700">₹{balance}</span>
               </div>
             </div>
+
+            {sellerComment && (
+              <div className="mt-3 bg-brand-50 border border-brand-200 rounded-xl p-3 text-xs text-brand-800">
+                <strong className="block mb-1">Seller Message / Meetup Details:</strong>
+                {sellerComment}
+              </div>
+            )}
+            
+            {order.status === 'Accepted' && !showPaymentUI && (
+              <button 
+                onClick={() => setShowPaymentUI(true)}
+                className="mt-3 w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 uppercase tracking-widest rounded-xl shadow-md transition-colors"
+              >
+                Pay Advance (₹{advance}) & Confirm
+              </button>
+            )}
+            
+            {showPaymentUI && (
+              <div className="mt-3 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-bold text-slate-900">Advance Payment</span>
+                  <button onClick={() => setShowPaymentUI(false)} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
+                </div>
+                <div className="flex flex-col items-center">
+                  <img src={storeSettings?.upiQrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=upi://pay?pa=${storeSettings?.upiId}&pn=${storeSettings?.storeName}&am=${advance}&cu=INR`} alt="QR" className="w-32 h-32 object-contain bg-white p-2 rounded-lg border border-slate-300" />
+                  <div className="mt-2 flex items-center gap-2 bg-white px-2 py-1 rounded border border-slate-200">
+                    <span className="text-xs font-bold">{storeSettings?.upiId}</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-700 uppercase mb-1">Upload Screenshot</label>
+                  <div className="relative border-2 border-dashed border-slate-300 rounded-lg p-2 flex flex-col items-center justify-center bg-white min-h-[80px]">
+                    {screenshotPreview ? (
+                      <img src={screenshotPreview} alt="Preview" className="h-16 object-contain" />
+                    ) : (
+                      <span className="text-[10px] text-slate-500 flex flex-col items-center gap-1"><UploadCloud size={16}/>Tap to upload</span>
+                    )}
+                    <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </div>
+                </div>
+                <button 
+                  onClick={submitPaymentProof}
+                  disabled={isUploading || !screenshotPreview}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 transition-colors text-white text-xs font-bold py-2 rounded-lg disabled:opacity-50"
+                >
+                  {isUploading ? 'Uploading...' : 'Submit Proof'}
+                </button>
+              </div>
+            )}
 
             {/* Progress Stages Bar */}
             {!isRejected && (

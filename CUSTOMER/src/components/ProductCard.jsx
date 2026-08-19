@@ -4,8 +4,9 @@ import { ShoppingCart, Check, Pin, Zap } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 export default function ProductCard({ product, onOrderClick }) {
-  const { addToCart, showToast } = useAppContext();
+  const { addToCart, showToast, storeSettings } = useAppContext();
   const [added, setAdded] = useState(false);
+  const isClosed = storeSettings?.isTemporarilyClosed;
 
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -13,6 +14,7 @@ export default function ProductCard({ product, onOrderClick }) {
 
   const handleQuickAdd = (e) => {
     e.stopPropagation();
+    if (isClosed) return;
     addToCart(product, 1);
     setAdded(true);
     showToast(`${product.name} added to bag!`);
@@ -77,16 +79,18 @@ export default function ProductCard({ product, onOrderClick }) {
         <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300 grid grid-cols-2">
           <button
             onClick={handleQuickAdd}
-            className="bg-white text-slate-900 text-xs font-bold py-2.5 tracking-wide hover:bg-slate-50 transition-colors flex items-center justify-center space-x-1 border-r border-slate-200"
+            disabled={isClosed}
+            className="bg-white text-slate-900 text-xs font-bold py-2.5 tracking-wide hover:bg-slate-50 transition-colors flex items-center justify-center space-x-1 border-r border-slate-200 disabled:opacity-50"
           >
             {added ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <ShoppingCart className="w-3.5 h-3.5" />}
             <span>{added ? 'Added' : 'Add'}</span>
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onOrderClick(product); }}
-            className="bg-slate-950 text-white text-xs font-bold py-2.5 tracking-wide hover:bg-black transition-colors"
+            disabled={isClosed}
+            className="bg-slate-950 text-white text-xs font-bold py-2.5 tracking-wide hover:bg-black transition-colors disabled:opacity-50"
           >
-            Order
+            {isClosed ? 'Closed' : 'Order'}
           </button>
         </div>
       </div>
@@ -112,7 +116,8 @@ export default function ProductCard({ product, onOrderClick }) {
 
           <button
             onClick={handleQuickAdd}
-            className="sm:hidden p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-900 transition-colors"
+            disabled={isClosed}
+            className="sm:hidden p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-900 transition-colors disabled:opacity-50"
             title="Add to bag"
           >
             {added ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <ShoppingCart className="w-3.5 h-3.5" />}

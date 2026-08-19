@@ -8,14 +8,29 @@ const OrderCard = ({ order }) => {
   const { updateOrderStatus, showToast } = useSeller();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showScreenshotModal, setShowScreenshotModal] = useState(false);
+  const [sellerComment, setSellerComment] = useState('');
+
+  const handleStatusChangeWithComment = (status, comment) => {
+    setIsProcessing(true);
+    let extra = {};
+    if (comment && order.id) {
+      let notesObj = {};
+      try { notesObj = JSON.parse(order.notes || '{}'); } catch(e){}
+      notesObj.sellerComment = comment;
+      extra = { notes: JSON.stringify(notesObj) };
+    }
+    updateOrderStatus(order.id, status, extra).then(() => {
+      setIsProcessing(false);
+      showToast(`Order marked as ${status}`);
+    }).catch(() => setIsProcessing(false));
+  };
 
   const handleStatusChange = (status) => {
     setIsProcessing(true);
-    setTimeout(() => {
-      updateOrderStatus(order.id, status);
+    updateOrderStatus(order.id, status).then(() => {
       setIsProcessing(false);
-      showToast(`Order status: ${status}`);
-    }, 250);
+      showToast(`Order marked as ${status}`);
+    }).catch(() => setIsProcessing(false));
   };
 
   const statusStyles = {
@@ -42,7 +57,9 @@ const OrderCard = ({ order }) => {
   const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateString = date.toLocaleDateString();
 
-  const isPendingReview = order.status === 'Pending Payment Review';
+  const statusNormalized = order.status?.trim() || 'Pending';
+  const isPending = statusNormalized.toLowerCase() === 'pending';
+  const isPaymentReview = statusNormalized === 'Pending Payment Review' || statusNormalized === 'Payment Review';
   const total = order.totalAmount || (order.productPrice * order.quantity) || 0;
   const advance = order.advanceAmount || Math.round(total * 0.2);
   const balance = Math.max(0, total - advance);
@@ -58,7 +75,7 @@ const OrderCard = ({ order }) => {
     <>
       <div className={clsx(
         "card p-5 transition-all duration-200 flex flex-col justify-between", 
-        isPendingReview ? 'border-yellow-400 shadow-md ring-2 ring-yellow-400 animate-pulse' : 
+        isPaymentReview ? 'border-yellow-400 shadow-md ring-2 ring-yellow-400 animate-pulse' : 
         order.status === 'Out for Delivery' ? 'border-purple-300 shadow-md ring-1 ring-purple-100' : ''
       )}>
         <div>
@@ -67,7 +84,7 @@ const OrderCard = ({ order }) => {
             <div>
               <div className="flex items-center gap-2 mb-0.5">
                 <h3 className="font-bold text-slate-900 text-base">{order.customerName}</h3>
-                {isPendingReview && (
+                {isPaymentReview && (
                    <span className="bg-yellow-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
                      Review Proof
                    </span>
@@ -152,42 +169,52 @@ const OrderCard = ({ order }) => {
           </div>
 
           {/* Stage Progression Buttons */}
-          <div className="flex gap-2 pt-1">
-            {isPendingReview && (
-              <>
-                <button 
-                  disabled={isProcessing}
-                  onClick={() => handleStatusChange('Rejected')}
-                  className="btn-danger py-1.5 px-3 text-xs font-semibold flex items-center gap-1"
-                >
+          <div className="flex flex-col gap-2 pt-1">
+            {isPending && (
+              <div className="flex gap-2">
+                <button disabled={isProcessing} onClick={() => handleStatusChange('Rejected')} className="btn-danger py-1.5 px-3 text-xs font-semibold flex items-center gap-1 flex-1 justify-center">
                   <XCircle size={14} /> Reject
                 </button>
-                <button 
-                  disabled={isProcessing}
-                  onClick={() => handleStatusChange('Printing')}
-                  className="btn-success flex-1 py-1.5 px-3 text-xs font-bold flex items-center justify-center gap-1 shadow-sm"
-                >
-                  <CheckCircle size={14} /> Verify & Start Printing
+                <button disabled={isProcessing} onClick={() => handleStatusChange('Accepted')} className="btn-success py-1.5 px-3 text-xs font-bold flex items-center gap-1 flex-1 justify-center shadow-sm">
+                  <CheckCircle size={14} /> Accept Order (Wait for Payment)
                 </button>
-              </>
+              </div>
             )}
 
-            {(order.status === 'Printing' || order.status === 'Accepted') && (
-              <button 
-                disabled={isProcessing}
-                onClick={() => handleStatusChange('Out for Delivery')}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
-              >
+            {order.status === 'Accepted' && (
+              <div className="w-full text-center text-[11px] font-bold text-amber-700 bg-amber-50 py-1.5 rounded-lg border border-amber-200">
+                ⏳ Waiting for customer to pay advance...
+              </div>
+            )}
+
+            {isPaymentReview && (
+              <div className="flex flex-col gap-2">
+                <input
+                  type="text"
+                  placeholder="Meetup Spot / Comments (e.g., Meet at Block A)"
+                  value={sellerComment}
+                  onChange={(e) => setSellerComment(e.target.value)}
+                  className="w-full text-xs border border-slate-300 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                />
+                <div className="flex gap-2">
+                  <button disabled={isProcessing} onClick={() => handleStatusChange('Rejected')} className="btn-danger py-1.5 px-3 text-xs font-semibold flex items-center gap-1">
+                    <XCircle size={14} /> Reject
+                  </button>
+                  <button disabled={isProcessing} onClick={() => handleStatusChangeWithComment('Printing', sellerComment)} className="btn-success flex-1 py-1.5 px-3 text-xs font-bold flex items-center justify-center gap-1 shadow-sm">
+                    <CheckCircle size={14} /> Verify Proof & Confirm
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {(order.status === 'Printing') && (
+              <button disabled={isProcessing} onClick={() => handleStatusChange('Out for Delivery')} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
                 <Truck size={14} /> Dispatch for Campus Delivery
               </button>
             )}
 
             {order.status === 'Out for Delivery' && (
-              <button 
-                disabled={isProcessing}
-                onClick={() => handleStatusChange('Delivered')}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all"
-              >
+              <button disabled={isProcessing} onClick={() => handleStatusChange('Delivered')} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all">
                 <CheckCircle size={14} /> Mark Delivered & COD Received (₹{balance})
               </button>
             )}
@@ -243,7 +270,7 @@ const OrderCard = ({ order }) => {
                   <button onClick={() => setShowScreenshotModal(false)} className="btn-secondary py-2 px-4 text-xs font-semibold">
                     Close
                   </button>
-                  {isPendingReview && (
+                  {isPaymentReview && (
                     <button 
                       onClick={() => {
                         handleStatusChange('Printing');

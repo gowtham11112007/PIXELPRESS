@@ -13,6 +13,8 @@ export default function Settings() {
   const [minAdvanceAmount, setMinAdvanceAmount] = useState(storeSettings.minAdvanceAmount || 100);
   const [storeName, setStoreName] = useState(storeSettings.storeName || 'PIXELPRESS');
   const [announcementText, setAnnouncementText] = useState(storeSettings.announcementText || '✦ FREE DELIVERY FOR PREPAID ORDERS ✦ SPLIT POSTERS ✦ CUSTOM PRINTS');
+  const [isTemporarilyClosed, setIsTemporarilyClosed] = useState(storeSettings.isTemporarilyClosed || false);
+  const [closedReason, setClosedReason] = useState(storeSettings.closedReason || 'Temporarily closed for maintenance.');
   
   const [isSaving, setIsSaving] = useState(false);
   const [qrPreview, setQrPreview] = useState(storeSettings.upiQrUrl || '');
@@ -45,7 +47,9 @@ export default function Settings() {
         defaultAdvancePercent: Number(defaultAdvancePercent) || 20,
         minAdvanceAmount: Number(minAdvanceAmount) || 100,
         storeName: storeName.trim() || 'PIXELPRESS',
-        announcementText: announcementText.trim()
+        announcementText: announcementText.trim(),
+        isTemporarilyClosed,
+        closedReason: closedReason.trim()
       });
     } catch (err) {
       console.error(err);
@@ -205,6 +209,38 @@ export default function Settings() {
                 <strong>Per-Product Customization:</strong> You can also set a custom advance amount (percentage or fixed ₹) on individual products when editing them in the Products Catalog.
               </span>
             </div>
+          </div>
+
+          {/* Section: Store Status */}
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
+              <Store className="w-5 h-5 text-brand-600" />
+              Store Status (Temporarily Closed)
+            </h2>
+            <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div>
+                <p className="text-sm font-bold text-slate-900">Close Store Temporarily</p>
+                <p className="text-xs text-slate-500">Disable ordering and show a closed message to customers.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" checked={isTemporarilyClosed} onChange={(e) => setIsTemporarilyClosed(e.target.checked)} className="sr-only peer" />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-500"></div>
+              </label>
+            </div>
+            {isTemporarilyClosed && (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Reason for Closing (Visible to Customers)
+                </label>
+                <input
+                  type="text"
+                  value={closedReason}
+                  onChange={(e) => setClosedReason(e.target.value)}
+                  placeholder="e.g., Closed due to exams, will be back on Monday!"
+                  className="input-field"
+                />
+              </div>
+            )}
           </div>
 
           {/* Section 3: Branding & Announcements */}
