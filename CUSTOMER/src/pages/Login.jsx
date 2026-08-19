@@ -86,18 +86,15 @@ export default function Login() {
   const handleCompleteProfile = async (e) => {
     e.preventDefault();
     setError('');
+    const finalName = name.trim() || supabaseUser?.user_metadata?.full_name || 'Student';
 
-    if (!name.trim()) {
-      setError('Please enter your full name.');
-      return;
-    }
     if (!phone.match(/^\d{10}$/)) {
       setError('Please enter a valid 10-digit phone number.');
       return;
     }
 
     try {
-      await login(name.trim(), phone.trim(), {
+      await login(finalName, phone.trim(), {
         email: supabaseUser?.email || '',
         avatar: supabaseUser?.user_metadata?.avatar_url || supabaseUser?.user_metadata?.picture || null,
         id: supabaseUser?.id || null
@@ -173,21 +170,6 @@ export default function Login() {
               </div>
 
               <form onSubmit={handleCompleteProfile} className="space-y-3">
-                <div>
-                  <label htmlFor="google-name" className="block text-[11px] font-bold tracking-wider text-slate-600 uppercase mb-1">
-                    Full Name
-                  </label>
-                  <input
-                    id="google-name"
-                    type="text"
-                    required
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Gowtham Yuvaraj"
-                    className="input-field text-sm"
-                  />
-                </div>
-
                 <div>
                   <label htmlFor="google-phone" className="block text-[11px] font-bold tracking-wider text-slate-600 uppercase mb-1">
                     Phone Number (10 Digits)
