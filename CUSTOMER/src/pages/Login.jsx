@@ -165,7 +165,7 @@ export default function Login() {
                   Enter Your WhatsApp Phone
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Used for hostel room delivery alerts and order updates.
+                  Used for delivery alerts and order updates.
                 </p>
               </div>
 

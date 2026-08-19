@@ -118,7 +118,7 @@ export default function CartDrawer() {
       return;
     }
     if (!loc) {
-      setError('Please enter your Hostel Name & Room No (or Dept)');
+      setError('Please enter your Building Name & Room No (or Dept)');
       return;
     }
     
@@ -281,7 +281,7 @@ export default function CartDrawer() {
                 </motion.div>
                 <h3 className="text-xl font-black text-gray-900">Order Placed!</h3>
                 <p className="text-gray-600 text-xs leading-relaxed max-w-xs">
-                  Your order is sent for payment verification. We will print your items and deliver them <strong>tomorrow to {campusLocation || 'your hostel/room'}</strong>!
+                  Your order is sent for payment verification. We will print your items and deliver them <strong>tomorrow to {campusLocation || 'your location'}</strong>!
                 </p>
               </div>
             ) : step === 'payment' ? (
@@ -472,7 +472,7 @@ export default function CartDrawer() {
 
                     <input
                       type="text"
-                      placeholder="Hostel Name & Room No (e.g. Block B, Room 304 / Dept)"
+                      placeholder="Building Name & Room No (e.g. Block B, Room 304 / Dept)"
                       value={campusLocation}
                       onChange={e => setCampusLocation(e.target.value)}
                       className="w-full text-xs border border-brand-300 bg-brand-50/30 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold text-slate-900"

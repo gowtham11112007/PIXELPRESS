@@ -228,7 +228,7 @@ export default function Collections() {
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. Multi-frame wall setups for hostel rooms"
+                    placeholder="e.g. Multi-frame wall setups for student rooms"
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     className="input-field text-xs"

@@ -49,7 +49,7 @@ const OrderCard = ({ order }) => {
 
   const handleWhatsAppDeliveryAlert = () => {
     const text = encodeURIComponent(
-      `Hi ${order.customerName}! 🚀 Your PixelPress poster order #${order.id.slice(0, 6).toUpperCase()} for "${order.productName}" is OUT FOR CAMPUS DELIVERY to ${order.campusLocation || 'your hostel/room'}!\n\n💰 COD Balance to pay: ₹${balance}\n📦 Delivery Slot: Next-Day Campus Delivery\n\nPlease be ready at your room/pickup spot.`
+      `Hi ${order.customerName}! 🚀 Your PixelPress poster order #${order.id.slice(0, 6).toUpperCase()} for "${order.productName}" is OUT FOR CAMPUS DELIVERY to ${order.campusLocation || 'your location'}!\n\n💰 COD Balance to pay: ₹${balance}\n📦 Delivery Slot: Next-Day Campus Delivery\n\nPlease be ready at your room/pickup spot.`
     );
     window.open(`https://wa.me/${(order.customerPhone || '').replace(/\D/g, '')}?text=${text}`, '_blank');
   };

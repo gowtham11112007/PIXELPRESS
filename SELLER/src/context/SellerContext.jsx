@@ -14,7 +14,7 @@ const DEFAULT_STORE_SETTINGS = {
   storeName: 'PixelPress Campus',
   announcementText: '⚡ LIGHTNING FAST 24-HOUR DELIVERY ✦ 300+ DPI ULTRA-HD PRINTS ✦ PREMIUM QUALITY GUARANTEED ✦ FREE FAST DELIVERY',
   cutoffTime: '21:00', // 9 PM cutoff for next-day delivery
-  campusLocations: ['Hostel Block A', 'Hostel Block B', 'Hostel Block C', 'Girls Hostel 1', 'Girls Hostel 2', 'Mechanical Dept', 'CSE Dept', 'Main Canteen Pickup']
+  campusLocations: ['Block A', 'Block B', 'Block C', 'Building 1', 'Building 2', 'Mechanical Dept', 'CSE Dept', 'Main Canteen Pickup']
 };
 
 const DEFAULT_COLLECTIONS = [
@@ -94,7 +94,7 @@ function normalizeSellerOrder(o) {
     totalAmount,
     status: o.status || 'Pending',
     timestamp: o.created_at || o.timestamp || o.date || new Date().toISOString(),
-    campusLocation: o.campusLocation || parsedNotes.campusLocation || parsedNotes.hostelOrDept || 'Campus Delivery',
+    campusLocation: o.campusLocation || parsedNotes.campusLocation || parsedNotes.locationOrDept || 'Campus Delivery',
     deliverySlot: o.deliverySlot || parsedNotes.deliverySlot || 'Next-Day Delivery',
     paymentScreenshotUrl: o.paymentScreenshotUrl || parsedNotes.paymentScreenshotUrl || o.payment_screenshot_url || null,
     advanceAmount: o.advanceAmount ?? parsedNotes.advanceAmount ?? null,
@@ -541,9 +541,16 @@ export const SellerProvider = ({ children }) => {
       )
       .subscribe();
 
+    const fallbackInterval = setInterval(() => {
+      fetchProducts();
+      fetchOrders();
+      fetchStoreSettings();
+    }, 15000);
+
     return () => {
       supabase.removeChannel(orderChannel);
       supabase.removeChannel(productChannel);
+      clearInterval(fallbackInterval);
     };
   }, [fetchProducts, fetchOrders, fetchStoreSettings]);
 

@@ -53,7 +53,7 @@ const Dashboard = () => {
     >
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Campus Store Overview</h1>
-        <p className="text-slate-500 text-sm mt-0.5">Next-day print queue, hostel deliveries, and merchandise inventory.</p>
+        <p className="text-slate-500 text-sm mt-0.5">Next-day print queue, campus deliveries, and merchandise inventory.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
@@ -99,7 +99,7 @@ const Dashboard = () => {
                 <thead className="bg-slate-50">
                   <tr>
                     <th scope="col" className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Product</th>
-                    <th scope="col" className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Hostel / Location</th>
+                    <th scope="col" className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Delivery Location</th>
                     <th scope="col" className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                     <th scope="col" className="px-5 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Time</th>
                   </tr>
@@ -120,7 +120,7 @@ const Dashboard = () => {
                         <div className="font-semibold text-slate-900">{order.customerName}</div>
                         <div className="text-slate-500 flex items-center gap-1">
                           <MapPin size={11} className="text-brand-600" />
-                          <span>{order.campusLocation || 'Hostel'}</span>
+                          <span>{order.campusLocation || 'Location'}</span>
                         </div>
                       </td>
                       <td className="px-5 py-3.5 whitespace-nowrap">
@@ -189,7 +189,7 @@ const Dashboard = () => {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              Verify payments and send accepted prints to queue. Tomorrow morning, dispatch campus delivery runners directly to student hostel rooms!
+              Verify payments and send accepted prints to queue. Tomorrow morning, dispatch campus delivery runners directly to student campus rooms!
             </p>
 
             <Link

@@ -55,7 +55,7 @@ function normalizeCustomerOrder(o) {
     status: o.status || 'Pending',
     date: o.created_at || o.date || o.timestamp || new Date().toISOString(),
     timestamp: o.created_at || o.date || o.timestamp || new Date().toISOString(),
-    campusLocation: o.campusLocation || parsedNotes.campusLocation || parsedNotes.hostelOrDept || 'Campus Delivery',
+    campusLocation: o.campusLocation || parsedNotes.campusLocation || parsedNotes.locationOrDept || 'Campus Delivery',
     deliverySlot: o.deliverySlot || parsedNotes.deliverySlot || '⚡ Next-Day Campus Delivery',
     notes: o.notes,
     paymentScreenshotUrl: o.paymentScreenshotUrl || parsedNotes.paymentScreenshotUrl || o.payment_screenshot_url || null,
@@ -422,15 +422,21 @@ export function AppProvider({ children }) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'products' },
         () => {
-          // Whenever ANY change (insert, update, delete) happens on products table, refresh both
           fetchStoreSettings();
           fetchProducts();
         }
       )
       .subscribe();
+      
+    // BULLETPROOF FALLBACK: Poll every 15 seconds in case WebSockets/Realtime are disabled in Supabase dashboard
+    const fallbackInterval = setInterval(() => {
+      fetchStoreSettings();
+      fetchProducts();
+    }, 15000);
 
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(fallbackInterval);
     };
   }, [fetchProducts, fetchStoreSettings]);
 
@@ -464,10 +470,15 @@ export function AppProvider({ children }) {
       )
       .subscribe();
 
+    const fallbackInterval = setInterval(() => {
+      fetchOrders();
+    }, 15000);
+
     return () => {
       supabase.removeChannel(channel);
+      clearInterval(fallbackInterval);
     };
-  }, [user]);
+  }, [user, fetchOrders]);
 
   // Listen to Supabase Auth State
   useEffect(() => {
@@ -641,7 +652,7 @@ export function AppProvider({ children }) {
     notes = '', 
     paymentScreenshotUrl = null, 
     advanceAmount = 0,
-    campusLocation = 'Hostel Delivery'
+    campusLocation = 'Campus Delivery'
   ) => {
     const activeUser = customerInfo || user;
     if (!activeUser || !activeUser.name || !activeUser.phone) {
@@ -658,7 +669,7 @@ export function AppProvider({ children }) {
     const notesPayload = JSON.stringify({
       paymentScreenshotUrl,
       advanceAmount,
-      campusLocation: campusLocation || 'Hostel Delivery',
+      campusLocation: campusLocation || 'Campus Delivery',
       deliverySlot: '⚡ Next-Day Campus Delivery',
       upiId: storeSettings.upiId,
       customerNote: notes

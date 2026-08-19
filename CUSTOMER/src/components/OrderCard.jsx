@@ -28,7 +28,7 @@ export default function OrderCard({ order }) {
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
-      `Hi PixelPress! I'd like to check on my campus order #${order.id.slice(0, 8).toUpperCase()} for "${order.product?.name}" (Hostel/Room: ${order.campusLocation || 'Hostel'}). Balance to pay: ₹${balance}.`
+      `Hi PixelPress! I'd like to check on my campus order #${order.id.slice(0, 8).toUpperCase()} for "${order.product?.name}" (Location: ${order.campusLocation || 'Location'}). Balance to pay: ₹${balance}.`
     );
     window.open(`https://wa.me/919047302794?text=${text}`, '_blank');
   };

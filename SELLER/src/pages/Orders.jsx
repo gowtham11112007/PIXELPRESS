@@ -87,7 +87,7 @@ const Orders = () => {
             Campus Delivery & Orders
           </h1>
           <p className="text-slate-500 text-sm mt-0.5">
-            Manage next-day hostel & department delivery fulfillment.
+            Manage next-day campus & department delivery fulfillment.
           </p>
         </div>
       </div>
@@ -130,7 +130,7 @@ const Orders = () => {
         <div className="relative">
           <input 
             type="text" 
-            placeholder="Search by student name, phone, hostel/room, or Order ID..."
+            placeholder="Search by student name, phone, location/room, or Order ID..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-all"
