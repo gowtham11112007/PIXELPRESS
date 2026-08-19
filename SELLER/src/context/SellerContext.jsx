@@ -313,7 +313,8 @@ export const SellerProvider = ({ children }) => {
             category: '__COLLECTION__',
             badge: newCol.description,
             image_url: newCol.image,
-            is_active: false
+            is_active: false,
+            price: 0
           }])
           .select()
           .single();

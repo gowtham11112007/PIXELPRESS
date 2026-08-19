@@ -108,20 +108,7 @@ export default function Login() {
     }
   };
 
-  // Handler: Direct Fast Phone & Name Login
-  const handleDirectLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (!name.trim()) { setError('Please enter your name.'); return; }
-    if (!phone.match(/^\d{10}$/)) { setError('Please enter a valid 10-digit phone number.'); return; }
 
-    try {
-      await login(name.trim(), phone.trim());
-      navigate('/');
-    } catch (err) {
-      setError(err.message || 'Failed to sign in.');
-    }
-  };
 
   const avatarUrl = supabaseUser?.user_metadata?.avatar_url || supabaseUser?.user_metadata?.picture;
   const userEmail = supabaseUser?.email;
@@ -226,7 +213,7 @@ export default function Login() {
                   type="submit"
                   className="w-full bg-slate-950 hover:bg-black text-white text-xs font-bold py-3 uppercase tracking-widest transition-all rounded-xl shadow-md flex items-center justify-center gap-2 mt-2"
                 >
-                  <span>Continue to Store</span>
+                  <span>Complete Login & Continue</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
@@ -242,68 +229,15 @@ export default function Login() {
               </div>
             </div>
           ) : (
-            /* STEP 1: Direct Fast Phone & Name Login + Google 1-Click */
+            /* STEP 1: Google 1-Click Login Only */
             <div className="space-y-4">
               <div>
                 <h2 className="text-base font-black text-slate-900 text-center">
                   Sign in to Order
                 </h2>
-                <p className="text-xs text-slate-500 text-center mt-0.5">
-                  Instant login with your name and phone number
+                <p className="text-xs text-slate-500 text-center mt-1">
+                  Please securely sign in with your Google account to continue.
                 </p>
-              </div>
-
-              {/* Fast Direct Login Form */}
-              <form onSubmit={handleDirectLogin} className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Your Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    placeholder="e.g. Gowtham Yuvaraj"
-                    className="input-field text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    10-Digit Mobile Number
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    placeholder="9876543210"
-                    className="input-field text-sm"
-                  />
-                </div>
-
-                {error && (
-                  <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
-                    {error}
-                  </p>
-                )}
-
-                <button
-                  type="submit"
-                  className="w-full bg-slate-950 hover:bg-black text-white text-xs font-black py-3.5 uppercase tracking-widest rounded-xl shadow-md transition-all active:scale-[0.98]"
-                >
-                  Sign In & Start Shopping
-                </button>
-              </form>
-
-              {/* Divider */}
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-slate-200"></div>
-                <span className="flex-shrink mx-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  or sign in with google
-                </span>
-                <div className="flex-grow border-t border-slate-200"></div>
               </div>
 
               {/* Google Login Button */}
