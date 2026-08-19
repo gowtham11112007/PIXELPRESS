@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, UploadCloud, CheckCircle, Copy, ExternalLink, MapPin, Zap } from 'lucide-react';
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, CheckCircle, MapPin, Zap } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
@@ -15,7 +15,6 @@ export default function CartDrawer() {
     updateCartQuantity, 
     checkoutCart, 
     user, 
-    login,
     storeSettings,
     showToast
   } = useAppContext();
@@ -26,14 +25,11 @@ export default function CartDrawer() {
   
   // Checkout flow state
   const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
-  const [isOrdering, setIsOrdering] = useState(false);
   const [error, setError] = useState('');
-  const [copiedUpi, setCopiedUpi] = useState(false);
   
   // Payment step state
   const [screenshotFile, setScreenshotFile] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
 
   const navigate = useNavigate();
 
@@ -122,7 +118,6 @@ export default function CartDrawer() {
       return;
     }
     try {
-      setIsOrdering(true);
       await checkoutCart(
         { name: customerName, phone: customerPhone },
         null,
@@ -137,110 +132,13 @@ export default function CartDrawer() {
       }, 2000);
     } catch (err) {
       setError(err.message || 'Error requesting order');
-    } finally {
-      setIsOrdering(false);
     }
   };
-
-  const handleImageChange = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      try {
-        setError('');
-        const compressed = await compressImage(file, 800, 800, 0.7);
-        setScreenshotFile(file);
-        setScreenshotPreview(compressed.dataUrl);
-      } catch (err) {
-        console.warn('Image preview compression error:', err);
-        setScreenshotFile(file);
-        setScreenshotPreview(URL.createObjectURL(file));
-      }
-    }
-  };
-
-  const handleFinalCheckout = async () => {
-    if (!screenshotFile && !screenshotPreview) {
-      setError('Please upload the payment screenshot to proceed.');
-      return;
-    }
-
-    try {
-      setIsUploading(true);
-      setError('');
-      
-      let finalScreenshotUrl = null;
-
-      // 1. Compress image
-      let compressed;
-      try {
-        compressed = await compressImage(screenshotFile, 900, 900, 0.75);
-      } catch (cErr) {
-        console.warn('Compression fallback to preview:', cErr);
-      }
-
-      const uploadDataUrl = compressed?.dataUrl || screenshotPreview;
-
-      // 2. Try Supabase storage upload with graceful fallback
-      if (isSupabaseConfigured && supabase && compressed?.blob) {
-        try {
-          const fileName = `adv_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-          const filePath = `advance_payments/${fileName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('payment_screenshots')
-            .upload(filePath, compressed.blob, { contentType: 'image/jpeg' });
-
-          if (!uploadError) {
-            const { data: publicUrlData } = supabase.storage
-              .from('payment_screenshots')
-              .getPublicUrl(filePath);
-            finalScreenshotUrl = publicUrlData?.publicUrl || uploadDataUrl;
-          } else {
-            finalScreenshotUrl = uploadDataUrl;
-          }
-        } catch {
-          finalScreenshotUrl = uploadDataUrl;
-        }
-      } else {
-        finalScreenshotUrl = uploadDataUrl;
-      }
-
-      setIsOrdering(true);
-      const customerName = (user?.name || name).trim();
-      const customerPhone = (user?.phone || phone).trim();
-      
-      await checkoutCart(
-        { name: customerName, phone: customerPhone }, 
-        finalScreenshotUrl,
-        advanceAmount,
-        campusLocation.trim()
-      );
-      
-      setStep('success');
-      showToast('Order submitted! Delivering tomorrow inside campus.');
-      setTimeout(() => {
-        setIsCartOpen(false);
-        navigate('/orders');
-      }, 2000);
-
-    } catch (err) {
-      console.error('Checkout error:', err);
-      setError(err.message || 'An error occurred during checkout. Please try again.');
-    } finally {
-      setIsUploading(false);
-      setIsOrdering(false);
-    }
-  };
-
-  // Dynamic QR Code URL (custom uploaded QR or generated UPI QR)
-  const upiPayDeepLink = `upi://pay?pa=${encodeURIComponent(storeSettings.upiId)}&pn=${encodeURIComponent(storeSettings.storeName)}&am=${advanceAmount}&cu=INR&tn=Campus%20Advance`;
-  const dynamicQrCodeUrl = storeSettings.upiQrUrl || `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiPayDeepLink)}`;
 
   return (
     <AnimatePresence>
       {isCartOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

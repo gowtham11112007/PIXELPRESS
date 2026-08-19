@@ -107,10 +107,12 @@ export default function OrderCard({ order }) {
         let notesObj = {};
         try { notesObj = JSON.parse(order.notes || '{}'); } catch(e){}
         notesObj.paymentScreenshotUrl = finalUrl;
-        order.notes = JSON.stringify(notesObj);
-        order.status = 'Payment Review';
         const all = JSON.parse(localStorage.getItem('pixelpress_orders') || '[]');
-        const updated = all.map(o => o.id === order.id ? order : o);
+        const updated = all.map(o => 
+          o.id === order.id 
+            ? { ...o, status: 'Payment Review', notes: JSON.stringify(notesObj) } 
+            : o
+        );
         localStorage.setItem('pixelpress_orders', JSON.stringify(updated));
         await fetchOrders();
         setShowPaymentUI(false);
