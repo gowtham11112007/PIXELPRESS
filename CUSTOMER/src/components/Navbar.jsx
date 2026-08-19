@@ -6,19 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import CartDrawer from './CartDrawer';
 
 // Marquee announcement bar — exactly like Posterized's running line
-function AnnouncementBar() {
-  const messages = [
-    "FREE DELIVERY FOR PREPAID ORDERS!",
-    "BUY 4 GET 3 FREE!",
-    "BUY 5 GET 5 FREE!",
-    "BUY 6 GET 12 FREE!",
-    "BUY 10 GET 26 FREE!",
-    "FREE DELIVERY FOR PREPAID ORDERS!",
-    "SPLIT POSTERS BUY 1 GET 2 FREE",
-    "SPLIT POSTERS BUY 2 GET 6 FREE",
-  ];
-  const text = messages.join("   ✦   ");
-
+function AnnouncementBar({ text }) {
   return (
     <div className="bg-black text-white text-[11px] sm:text-xs font-medium tracking-widest overflow-hidden py-2">
       <div className="marquee-track select-none whitespace-nowrap">
@@ -32,7 +20,7 @@ function AnnouncementBar() {
 }
 
 export default function Navbar() {
-  const { user, logout, cart, setIsCartOpen, orders } = useAppContext();
+  const { user, logout, cart, setIsCartOpen, orders, storeSettings, collections } = useAppContext();
   const navigate = useNavigate();
 
   const totalCartCount = cart.reduce((total, item) => total + item.quantity, 0);
@@ -42,9 +30,13 @@ export default function Navbar() {
     navigate('/login');
   };
 
+  const navLinks = collections && collections.length > 0 
+    ? collections.slice(0, 4) 
+    : [];
+
   return (
     <>
-      <AnnouncementBar />
+      <AnnouncementBar text={storeSettings?.announcementText || "⚡ LIGHTNING FAST DELIVERY"} />
       <nav className="sticky top-0 z-40 bg-white border-b border-gray-200">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
           <div className="flex justify-between items-center h-14 sm:h-16">
@@ -55,7 +47,7 @@ export default function Navbar() {
                 <ShoppingBag className="w-4 h-4 text-white" />
               </div>
               <span className="text-lg sm:text-xl font-bold tracking-tight text-black">
-                PixelPress
+                {storeSettings?.storeName || 'PixelPress'}
               </span>
             </Link>
 
@@ -63,9 +55,15 @@ export default function Navbar() {
             <div className="hidden md:flex items-center space-x-6 text-sm font-medium text-gray-700">
               <Link to="/" className="hover:text-black transition-colors py-1 border-b-2 border-transparent hover:border-black">Home</Link>
               <Link to="/orders" className="hover:text-black transition-colors py-1 border-b-2 border-transparent hover:border-black">My Orders ({orders.length})</Link>
-              <a href="#products" className="hover:text-black transition-colors py-1 border-b-2 border-transparent hover:border-black">Wall Setups</a>
-              <a href="#products" className="hover:text-black transition-colors py-1 border-b-2 border-transparent hover:border-black">Split Posters</a>
-              <a href="#products" className="hover:text-black transition-colors py-1 border-b-2 border-transparent hover:border-black">Motivation</a>
+              {navLinks.map(col => (
+                <button 
+                  key={col.id} 
+                  onClick={() => window.dispatchEvent(new CustomEvent('SET_CATEGORY', { detail: col.name }))}
+                  className="hover:text-black transition-colors py-1 border-b-2 border-transparent hover:border-black cursor-pointer"
+                >
+                  {col.name}
+                </button>
+              ))}
             </div>
 
             {/* RIGHT: Icons */}

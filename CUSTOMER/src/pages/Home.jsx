@@ -56,6 +56,15 @@ export default function Home() {
     }
   }, [categories, activeCategory]);
 
+  React.useEffect(() => {
+    const handleSetCategory = (e) => {
+      setActiveCategory(e.detail);
+      document.getElementById('products')?.scrollIntoView({ behavior: 'smooth' });
+    };
+    window.addEventListener('SET_CATEGORY', handleSetCategory);
+    return () => window.removeEventListener('SET_CATEGORY', handleSetCategory);
+  }, []);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }} 

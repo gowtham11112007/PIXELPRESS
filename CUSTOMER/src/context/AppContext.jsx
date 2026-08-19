@@ -187,18 +187,19 @@ export function AppProvider({ children }) {
         const { data: sData } = await supabase
           .from('products')
           .select('*')
-          .eq('category', '__STORE_SETTINGS__')
-          .limit(1);
+          .in('category', ['__STORE_SETTINGS__', '__PROMO_SETTINGS__']);
 
-        if (sData && sData.length > 0) {
-          const s = sData[0];
+        if (sData) {
+          const s = sData.find(d => d.category === '__STORE_SETTINGS__') || {};
+          const p = sData.find(d => d.category === '__PROMO_SETTINGS__') || {};
+          
           setStoreSettings({
             upiId: s.badge || DEFAULT_STORE_SETTINGS.upiId,
             upiQrUrl: s.image_url || '',
             defaultAdvancePercent: s.original_price || DEFAULT_STORE_SETTINGS.defaultAdvancePercent,
             minAdvanceAmount: s.price || DEFAULT_STORE_SETTINGS.minAdvanceAmount,
             storeName: s.name || DEFAULT_STORE_SETTINGS.storeName,
-            announcementText: DEFAULT_STORE_SETTINGS.announcementText
+            announcementText: p.name || DEFAULT_STORE_SETTINGS.announcementText
           });
         }
 

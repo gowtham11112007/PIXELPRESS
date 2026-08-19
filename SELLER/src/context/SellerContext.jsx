@@ -195,11 +195,12 @@ export const SellerProvider = ({ children }) => {
         const { data: sData } = await supabase
           .from('products')
           .select('*')
-          .eq('category', '__STORE_SETTINGS__')
-          .limit(1);
+          .in('category', ['__STORE_SETTINGS__', '__PROMO_SETTINGS__']);
 
-        if (sData && sData.length > 0) {
-          const s = sData[0];
+        if (sData) {
+          const s = sData.find(d => d.category === '__STORE_SETTINGS__') || {};
+          const p = sData.find(d => d.category === '__PROMO_SETTINGS__') || {};
+          
           setStoreSettings(prev => ({
             ...prev,
             upiId: s.badge || DEFAULT_STORE_SETTINGS.upiId,
@@ -207,6 +208,7 @@ export const SellerProvider = ({ children }) => {
             defaultAdvancePercent: s.original_price || DEFAULT_STORE_SETTINGS.defaultAdvancePercent,
             minAdvanceAmount: s.price || DEFAULT_STORE_SETTINGS.minAdvanceAmount,
             storeName: s.name || DEFAULT_STORE_SETTINGS.storeName,
+            announcementText: p.name || DEFAULT_STORE_SETTINGS.announcementText
           }));
         }
 
@@ -260,22 +262,35 @@ export const SellerProvider = ({ children }) => {
           is_active: false
         };
 
+        const promoPayload = {
+          name: merged.announcementText || DEFAULT_STORE_SETTINGS.announcementText,
+          category: '__PROMO_SETTINGS__',
+          price: 0,
+          is_active: false
+        };
+
         const { data: existing } = await supabase
           .from('products')
-          .select('id')
-          .eq('category', '__STORE_SETTINGS__')
-          .limit(1);
+          .select('id, category')
+          .in('category', ['__STORE_SETTINGS__', '__PROMO_SETTINGS__']);
 
-        if (existing && existing.length > 0) {
-          await supabase
-            .from('products')
-            .update(settingsPayload)
-            .eq('id', existing[0].id);
+        const existingSettingsId = existing?.find(e => e.category === '__STORE_SETTINGS__')?.id;
+        const existingPromoId = existing?.find(e => e.category === '__PROMO_SETTINGS__')?.id;
+
+        const upserts = [];
+        if (existingSettingsId) {
+          upserts.push(supabase.from('products').update(settingsPayload).eq('id', existingSettingsId));
         } else {
-          await supabase
-            .from('products')
-            .insert([settingsPayload]);
+          upserts.push(supabase.from('products').insert([settingsPayload]));
         }
+
+        if (existingPromoId) {
+          upserts.push(supabase.from('products').update(promoPayload).eq('id', existingPromoId));
+        } else {
+          upserts.push(supabase.from('products').insert([promoPayload]));
+        }
+
+        await Promise.all(upserts);
 
         showToast('Store & delivery settings updated!');
       } catch (err) {
