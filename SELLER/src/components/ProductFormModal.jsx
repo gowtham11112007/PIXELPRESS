@@ -113,31 +113,35 @@ const ProductFormModal = ({ isOpen, onClose, editingProduct = null }) => {
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          {/* Backdrop */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
             onClick={onClose}
           />
+
+          {/* Centered Modal Card */}
           <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.92, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-2xl shadow-2xl z-50 overflow-hidden max-h-[92vh] flex flex-col"
+            exit={{ opacity: 0, scale: 0.92, y: 15 }}
+            transition={{ type: "spring", duration: 0.3, bounce: 0.2 }}
+            className="relative w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col z-10 my-auto"
           >
-            <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50/50">
-              <h2 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-brand-600" />
-                {editingProduct ? `Edit Product: ${editingProduct.name}` : 'Add New Item / Poster'}
+            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-slate-100 bg-slate-50/70">
+              <h2 className="font-bold text-sm sm:text-base text-slate-900 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-brand-600" />
+                {editingProduct ? `Edit Item: ${editingProduct.name}` : 'Add New Item / Poster'}
               </h2>
               <button onClick={onClose} className="p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors">
                 <X size={18} />
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
               {/* Image Input */}
               <div>
                 <div className="flex justify-between items-center mb-1.5">
@@ -167,7 +171,7 @@ const ProductFormModal = ({ isOpen, onClose, editingProduct = null }) => {
                   <div className="border-2 border-slate-300 border-dashed rounded-xl p-4 hover:border-brand-500 transition-colors relative overflow-hidden group cursor-pointer text-center bg-slate-50 min-h-[120px] flex items-center justify-center">
                     {preview ? (
                       <>
-                        <img src={preview} alt="Preview" className="w-24 h-24 object-cover rounded-lg shadow-sm" />
+                        <img src={preview} alt="Preview" className="w-20 h-24 sm:w-24 sm:h-28 object-cover rounded-lg shadow-sm" />
                         <div className="ml-4 text-left">
                           <p className="text-xs font-bold text-slate-800">Photo Loaded</p>
                           <p className="text-[11px] text-brand-600 font-semibold mt-0.5">Click to replace photo</p>
@@ -293,7 +297,7 @@ const ProductFormModal = ({ isOpen, onClose, editingProduct = null }) => {
                     Advance Payment Rule
                   </label>
                   <span className="text-[10px] font-semibold text-amber-700">
-                    Store Default: {storeSettings.defaultAdvancePercent}% (Min ₹{storeSettings.minAdvanceAmount})
+                    Default: {storeSettings.defaultAdvancePercent}% (Min ₹{storeSettings.minAdvanceAmount})
                   </span>
                 </div>
 
@@ -350,7 +354,7 @@ const ProductFormModal = ({ isOpen, onClose, editingProduct = null }) => {
                       <Pin className="w-3.5 h-3.5 text-amber-500" />
                       Pin to Top
                     </span>
-                    <span className="text-[10px] text-slate-400 block">Feature at top of store</span>
+                    <span className="text-[10px] text-slate-400 block">Feature on store</span>
                   </div>
                 </label>
 
@@ -366,7 +370,7 @@ const ProductFormModal = ({ isOpen, onClose, editingProduct = null }) => {
                       <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
                       In Stock
                     </span>
-                    <span className="text-[10px] text-slate-400 block">Available for students</span>
+                    <span className="text-[10px] text-slate-400 block">Available</span>
                   </div>
                 </label>
               </div>
@@ -377,12 +381,12 @@ const ProductFormModal = ({ isOpen, onClose, editingProduct = null }) => {
                   Cancel
                 </button>
                 <button type="submit" disabled={isSubmitting} className="btn-primary flex-1 py-2.5 shadow-md text-xs font-bold">
-                  {isSubmitting ? 'Saving...' : editingProduct ? 'Save Product Changes' : 'Publish to Store'}
+                  {isSubmitting ? 'Saving...' : editingProduct ? 'Save Changes' : 'Publish Item'}
                 </button>
               </div>
             </form>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   );

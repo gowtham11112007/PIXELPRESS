@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingBag, ArrowRight, CheckCircle2, Phone, User as UserIcon, LogOut, Loader2 } from 'lucide-react';
+import { ShoppingBag, ArrowRight, CheckCircle2, Phone, User as UserIcon, LogOut, Loader2, Sparkles } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
@@ -28,14 +28,13 @@ function GoogleIcon({ className = "w-5 h-5" }) {
 }
 
 export default function Login() {
-  const { user, supabaseUser, login, logout, authLoading } = useAppContext();
+  const { user, supabaseUser, login, logout, authLoading, storeSettings } = useAppContext();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [isSigningInGoogle, setIsSigningInGoogle] = useState(false);
-  const [showManualForm, setShowManualForm] = useState(false);
 
   // If already logged in with phone, navigate home
   useEffect(() => {
@@ -63,20 +62,22 @@ export default function Login() {
       setIsSigningInGoogle(true);
 
       if (!isSupabaseConfigured || !supabase) {
-        throw new Error('Supabase is not configured yet. Please check your environment variables.');
+        throw new Error('Cloud auth is not active. You can log in instantly with your Phone number below.');
       }
+
+      const redirectUrl = window.location.origin;
 
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin
+          redirectTo: redirectUrl
         }
       });
 
       if (authError) throw authError;
     } catch (err) {
       console.error('Google Sign In Error:', err);
-      setError(err.message || 'Failed to initialize Google Sign In.');
+      setError(err.message || 'Google OAuth is redirecting. You can also sign in directly with Phone below.');
       setIsSigningInGoogle(false);
     }
   };
@@ -107,8 +108,8 @@ export default function Login() {
     }
   };
 
-  // Handler: Direct Manual Login (Fallback)
-  const handleManualLogin = async (e) => {
+  // Handler: Direct Fast Phone & Name Login
+  const handleDirectLogin = async (e) => {
     e.preventDefault();
     setError('');
     if (!name.trim()) { setError('Please enter your name.'); return; }
@@ -118,7 +119,7 @@ export default function Login() {
       await login(name.trim(), phone.trim());
       navigate('/');
     } catch (err) {
-      setError(err.message || 'Failed to log in.');
+      setError(err.message || 'Failed to sign in.');
     }
   };
 
@@ -126,71 +127,67 @@ export default function Login() {
   const userEmail = supabaseUser?.email;
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Top accent */}
-      <div className="h-1 bg-black w-full" />
-
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-        {/* Logo Header */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 bg-black rounded flex items-center justify-center mb-3 shadow-md">
-            <ShoppingBag className="w-7 h-7 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-black">PixelPress</h1>
-          <p className="text-gray-500 text-sm mt-1 text-center">
-            Custom Posters, Delivered on Campus
-          </p>
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-10 px-4 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <div className="w-12 h-12 bg-slate-950 text-white rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-md">
+          <ShoppingBag className="w-6 h-6" />
         </div>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          {storeSettings?.storeName || 'PixelPress'}
+        </h1>
+        <p className="text-slate-500 text-xs sm:text-sm mt-1">
+          Next-Day Campus Poster & Merch Delivery
+        </p>
+      </div>
 
-        {/* Card */}
-        <div className="w-full max-w-sm border border-gray-200 bg-white p-6 sm:p-8 shadow-sm">
+      <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-7 px-5 sm:px-8 shadow-xl rounded-3xl border border-slate-200">
           {authLoading ? (
             <div className="flex flex-col items-center justify-center py-8 space-y-3">
-              <Loader2 className="w-6 h-6 animate-spin text-black" />
-              <p className="text-xs text-gray-500 font-medium">Checking authentication...</p>
+              <Loader2 className="w-6 h-6 animate-spin text-slate-900" />
+              <p className="text-xs text-slate-500 font-medium">Loading sign-in...</p>
             </div>
           ) : supabaseUser && !user?.phone ? (
             /* STEP 2: Google Authenticated -> Complete Profile with Phone Number */
             <div>
-              <div className="flex items-center space-x-2 text-green-700 bg-green-50 border border-green-200 px-3 py-2 text-xs font-semibold rounded-none mb-5">
-                <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+              <div className="flex items-center space-x-2 text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs font-bold rounded-xl mb-4">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Google Account Connected</span>
               </div>
 
               {/* User Google Badge */}
-              <div className="flex items-center space-x-3 mb-6 p-3 bg-gray-50 border border-gray-100">
+              <div className="flex items-center space-x-3 mb-5 p-3 bg-slate-50 rounded-2xl border border-slate-100">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
                     alt="Google Profile"
-                    className="w-10 h-10 rounded-full border border-gray-200 object-cover"
+                    className="w-10 h-10 rounded-full border border-slate-200 object-cover"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center font-bold text-sm">
+                  <div className="w-10 h-10 rounded-full bg-slate-950 text-white flex items-center justify-center font-bold text-sm">
                     {name ? name[0].toUpperCase() : 'U'}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-gray-900 truncate">
-                    {supabaseUser.user_metadata?.full_name || name || 'Signed in'}
+                  <p className="text-xs font-bold text-slate-900 truncate">
+                    {supabaseUser.user_metadata?.full_name || name || 'Student'}
                   </p>
-                  <p className="text-[11px] text-gray-500 truncate">{userEmail}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{userEmail}</p>
                 </div>
               </div>
 
               <div className="mb-4">
-                <h2 className="text-base font-bold text-gray-900">
-                  Complete Your Profile
+                <h2 className="text-sm font-bold text-slate-900">
+                  Enter Your WhatsApp Phone
                 </h2>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Enter your phone number so we can notify you about poster delivery on campus.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Used for hostel room delivery alerts and order updates.
                 </p>
               </div>
 
-              <form onSubmit={handleCompleteProfile} className="space-y-4">
+              <form onSubmit={handleCompleteProfile} className="space-y-3">
                 <div>
-                  <label htmlFor="google-name" className="block text-xs font-semibold tracking-widest text-gray-500 uppercase mb-1.5 flex items-center gap-1.5">
-                    <UserIcon className="w-3.5 h-3.5 text-gray-400" />
+                  <label htmlFor="google-name" className="block text-[11px] font-bold tracking-wider text-slate-600 uppercase mb-1">
                     Full Name
                   </label>
                   <input
@@ -200,153 +197,134 @@ export default function Login() {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="e.g. Gowtham Yuvaraj"
-                    className="w-full border border-gray-300 rounded-none px-3 py-2.5 text-sm focus:outline-none focus:border-black transition-colors placeholder-gray-400"
+                    className="input-field text-sm"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="google-phone" className="block text-xs font-semibold tracking-widest text-gray-500 uppercase mb-1.5 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5 text-gray-400" />
+                  <label htmlFor="google-phone" className="block text-[11px] font-bold tracking-wider text-slate-600 uppercase mb-1">
                     Phone Number (10 Digits)
                   </label>
-                  <div className="relative flex items-center">
-                    <span className="absolute left-3 text-xs text-gray-400 font-semibold select-none">
-                      +91
-                    </span>
-                    <input
-                      id="google-phone"
-                      type="tel"
-                      required
-                      value={phone}
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      placeholder="9876543210"
-                      className="w-full border border-gray-300 rounded-none pl-11 pr-3 py-2.5 text-sm focus:outline-none focus:border-black transition-colors placeholder-gray-400"
-                    />
-                  </div>
+                  <input
+                    id="google-phone"
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="9876543210"
+                    className="input-field text-sm"
+                  />
                 </div>
 
                 {error && (
-                  <p className="text-xs text-red-600 border border-red-200 bg-red-50 px-3 py-2">
+                  <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
                     {error}
                   </p>
                 )}
 
                 <button
                   type="submit"
-                  className="w-full bg-black hover:bg-gray-800 text-white text-xs font-semibold py-3 tracking-widest uppercase transition-all flex items-center justify-center space-x-2 mt-2 active:scale-[0.98]"
+                  className="w-full bg-slate-950 hover:bg-black text-white text-xs font-bold py-3 uppercase tracking-widest transition-all rounded-xl shadow-md flex items-center justify-center gap-2 mt-2"
                 >
                   <span>Continue to Store</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
 
-              <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center">
+              <div className="mt-4 pt-3 border-t border-slate-100 text-center">
                 <button
                   onClick={logout}
-                  className="text-xs text-gray-400 hover:text-red-600 flex items-center gap-1 transition-colors"
+                  className="text-xs text-slate-400 hover:text-red-600 flex items-center justify-center gap-1 mx-auto transition-colors"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>Use a different Google account</span>
+                  <span>Use different account</span>
                 </button>
               </div>
             </div>
           ) : (
-            /* STEP 1: Sign in with Google (Primary) or Manual Login */
-            <div>
-              <h2 className="text-base font-semibold text-gray-900 mb-1 text-center">
-                Sign in to PixelPress
-              </h2>
-              <p className="text-xs text-gray-500 text-center mb-6">
-                Sign in with Google to explore posters and track your orders.
-              </p>
+            /* STEP 1: Direct Fast Phone & Name Login + Google 1-Click */
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-base font-black text-slate-900 text-center">
+                  Sign in to Order
+                </h2>
+                <p className="text-xs text-slate-500 text-center mt-0.5">
+                  Instant login with your name and phone number
+                </p>
+              </div>
 
-              {/* Primary Google Login Button */}
+              {/* Fast Direct Login Form */}
+              <form onSubmit={handleDirectLogin} className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Your Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="e.g. Gowtham Yuvaraj"
+                    className="input-field text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    10-Digit Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    value={phone}
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="9876543210"
+                    className="input-field text-sm"
+                  />
+                </div>
+
+                {error && (
+                  <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-xl border border-red-200">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full bg-slate-950 hover:bg-black text-white text-xs font-black py-3.5 uppercase tracking-widest rounded-xl shadow-md transition-all active:scale-[0.98]"
+                >
+                  Sign In & Start Shopping
+                </button>
+              </form>
+
+              {/* Divider */}
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="flex-shrink mx-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  or sign in with google
+                </span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
+
+              {/* Google Login Button */}
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={isSigningInGoogle}
-                className="w-full border border-gray-300 hover:border-black bg-white hover:bg-gray-50 text-gray-800 text-sm font-semibold py-3 px-4 flex items-center justify-center space-x-3 transition-all active:scale-[0.98] shadow-sm disabled:opacity-50"
+                className="w-full border border-slate-300 hover:border-slate-400 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold py-3 px-4 rounded-xl flex items-center justify-center space-x-2 transition-all active:scale-[0.98] shadow-xs disabled:opacity-50"
               >
                 {isSigningInGoogle ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin text-gray-600" />
+                    <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
                     <span>Connecting to Google...</span>
                   </>
                 ) : (
                   <>
-                    <GoogleIcon className="w-5 h-5 flex-shrink-0" />
+                    <GoogleIcon className="w-4 h-4 flex-shrink-0" />
                     <span>Continue with Google</span>
                   </>
                 )}
               </button>
-
-              {error && (
-                <p className="text-xs text-red-600 border border-red-200 bg-red-50 px-3 py-2 mt-4">
-                  {error}
-                </p>
-              )}
-
-              {/* Divider for manual fallback */}
-              <div className="relative flex py-5 items-center">
-                <div className="flex-grow border-t border-gray-200"></div>
-                <span className="flex-shrink mx-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                  or
-                </span>
-                <div className="flex-grow border-t border-gray-200"></div>
-              </div>
-
-              {!showManualForm ? (
-                <button
-                  type="button"
-                  onClick={() => setShowManualForm(true)}
-                  className="w-full text-xs text-gray-600 hover:text-black font-semibold py-2 border border-dashed border-gray-300 hover:border-gray-400 transition-colors uppercase tracking-wider text-center"
-                >
-                  Continue with Phone & Name
-                </button>
-              ) : (
-                <form onSubmit={handleManualLogin} className="space-y-4 pt-1">
-                  <div>
-                    <label htmlFor="manual-name" className="block text-xs font-semibold tracking-widest text-gray-500 uppercase mb-1">
-                      Full Name
-                    </label>
-                    <input
-                      id="manual-name"
-                      type="text"
-                      required
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      placeholder="e.g. Gowtham Yuvaraj"
-                      className="w-full border border-gray-300 rounded-none px-3 py-2 text-sm focus:outline-none focus:border-black transition-colors"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="manual-phone" className="block text-xs font-semibold tracking-widest text-gray-500 uppercase mb-1">
-                      Phone Number
-                    </label>
-                    <input
-                      id="manual-phone"
-                      type="tel"
-                      required
-                      value={phone}
-                      onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      placeholder="10-digit mobile number"
-                      className="w-full border border-gray-300 rounded-none px-3 py-2 text-sm focus:outline-none focus:border-black transition-colors"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full bg-black hover:bg-gray-800 text-white text-xs font-semibold py-2.5 tracking-widest uppercase transition-colors active:scale-[0.98]"
-                  >
-                    Continue
-                  </button>
-                </form>
-              )}
-
-              <p className="text-center text-[11px] text-gray-400 mt-6 leading-relaxed">
-                By continuing, you agree to receive order and delivery updates on campus.
-              </p>
             </div>
           )}
         </div>
