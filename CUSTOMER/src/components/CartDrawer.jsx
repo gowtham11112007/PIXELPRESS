@@ -25,17 +25,14 @@ export default function CartDrawer() {
   const [phone, setPhone] = useState(user?.phone || '');
   const [campusLocation, setCampusLocation] = useState('');
   
-  // Checkout flow state
-  const [step, setStep] = useState('cart'); // 'cart' | 'payment' | 'success'
+  const [step, setStep] = useState('cart'); // 'cart' | 'details' | 'payment' | 'success'
   const [error, setError] = useState('');
-  
-  // Payment step state
+  const [copiedUpi, setCopiedUpi] = useState(false);
   const [screenshotFile, setScreenshotFile] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
 
   const navigate = useNavigate();
 
-  // Sync state if user changes
   React.useEffect(() => {
     if (user) {
       setName(user.name || '');
@@ -43,7 +40,6 @@ export default function CartDrawer() {
     }
   }, [user]);
 
-  // Reset drawer state when it closes or opens
   React.useEffect(() => {
     if (isCartOpen) {
       setStep('cart');
@@ -53,19 +49,15 @@ export default function CartDrawer() {
     }
   }, [isCartOpen]);
 
-  // Calculate dynamic total and advance amounts based on store settings & per-product rules
   const totalAmount = cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
 
   const calculateAdvanceAmount = () => {
     if (cart.length === 0) return 0;
-    
     let totalAdvance = 0;
     let hasCustomAdvance = false;
-
     cart.forEach(item => {
       const p = item.product;
       const itemTotal = p.price * item.quantity;
-
       if (p.advanceType === 'fixed') {
         totalAdvance += (Number(p.advanceValue) || 0) * item.quantity;
         hasCustomAdvance = true;
@@ -76,17 +68,14 @@ export default function CartDrawer() {
       } else if (p.advanceType === 'zero') {
         hasCustomAdvance = true;
       } else {
-        // Default store percentage
         const pct = Number(storeSettings.defaultAdvancePercent) || 20;
         totalAdvance += Math.round(itemTotal * (pct / 100));
       }
     });
-
     if (!hasCustomAdvance) {
       const minAdv = Number(storeSettings.minAdvanceAmount) || 100;
       totalAdvance = Math.max(minAdv, totalAdvance);
     }
-
     return Math.min(totalAmount, Math.max(0, totalAdvance));
   };
 
@@ -99,41 +88,47 @@ export default function CartDrawer() {
     setTimeout(() => setCopiedUpi(false), 2000);
   };
 
-  const handlePlaceOrder = async (e) => {
-    e.preventDefault();
-    setError('');
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const compressed = await compressImage(file);
+      setScreenshotFile(compressed);
+      setScreenshotPreview(URL.createObjectURL(compressed));
+    }
+  };
 
-    const customerName = (user?.name || name).trim();
-    const customerPhone = (user?.phone || phone).trim();
-    const loc = campusLocation.trim();
+  const proceedToDetails = () => {
+    if (cart.length === 0) return;
+    setStep('details');
+  };
 
-    if (!customerName) {
-      setError('Please enter your name');
+  const proceedToPayment = () => {
+    if (!name.trim() || !phone.match(/^\d{10}$/) || !campusLocation.trim()) {
+      setError('Please fill in all delivery details correctly');
       return;
     }
-    if (!customerPhone.match(/^\d{10}$/)) {
-      setError('Please enter a valid 10-digit phone number');
-      return;
-    }
-    if (!loc) {
-      setError('Please enter your Building Name & Room No (or Dept)');
+    setStep('payment');
+  };
+
+  const handleCompleteOrder = async () => {
+    if (!screenshotFile) {
+      setError('Please upload payment screenshot');
       return;
     }
     try {
       await checkoutCart(
-        { name: customerName, phone: customerPhone },
-        null,
-        0,
-        loc
+        { name: name.trim(), phone: phone.trim() },
+        screenshotFile,
+        advanceAmount,
+        campusLocation.trim()
       );
       setStep('success');
-      showToast('Order requested! Please check My Orders for seller confirmation.');
       setTimeout(() => {
         setIsCartOpen(false);
         navigate('/orders');
-      }, 2000);
+      }, 2500);
     } catch (err) {
-      setError(err.message || 'Error requesting order');
+      setError(err.message || 'Payment submission failed');
     }
   };
 
@@ -141,176 +136,70 @@ export default function CartDrawer() {
     <AnimatePresence>
       {isCartOpen && (
         <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setIsCartOpen(false)}
-            className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
-          />
-
-          {/* Drawer */}
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 right-0 w-full sm:max-w-md bg-white z-50 shadow-2xl flex flex-col"
-          >
-            {/* Header */}
-            <div className="p-4 sm:p-5 border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <ShoppingBag className="w-5 h-5 text-black" />
-                <h2 className="text-base font-bold text-black tracking-tight">
-                  {step === 'cart' && `Your Bag (${cart.length})`}
-                  {step === 'payment' && 'Verify Advance Payment'}
-                  {step === 'success' && 'Order Received'}
-                </h2>
-              </div>
-              <button
-                onClick={() => setIsCartOpen(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsCartOpen(false)} className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" />
+          <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 25, stiffness: 200 }} className="fixed inset-y-0 right-0 w-full sm:max-w-md bg-white z-50 shadow-2xl flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h2 className="text-base font-bold flex items-center gap-2"><ShoppingBag className="w-5 h-5" /> Checkout</h2>
+              <button onClick={() => setIsCartOpen(false)}><X className="w-5 h-5" /></button>
             </div>
 
-            {/* Next-Day Campus Delivery Promise Banner */}
-            <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-black flex items-center justify-center gap-1.5 shadow-xs uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 fill-slate-950" />
-              <span>Next-Day Campus Room & Dept Delivery</span>
-            </div>
-
-            {/* Content */}
-            {step === 'success' ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
-                <motion.div 
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ type: 'spring', bounce: 0.5 }}
-                  className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center"
-                >
-                  <CheckCircle className="w-9 h-9 text-emerald-600" />
-                </motion.div>
-                <h3 className="text-xl font-black text-gray-900">Order Placed!</h3>
-                <p className="text-gray-600 text-xs leading-relaxed max-w-xs">
-                  Your order is sent for payment verification. We will print your items and deliver them <strong>tomorrow to {campusLocation || 'your location'}</strong>!
-                </p>
-              </div>
-            ) : cart.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                <div className="text-5xl mb-3">🛍️</div>
-                <h3 className="text-base font-bold text-gray-900">Your bag is empty</h3>
-                <p className="text-gray-400 text-xs mt-1 mb-6">Explore campus posters, pins & merch!</p>
-                <button
-                  onClick={() => setIsCartOpen(false)}
-                  className="bg-black text-white text-xs font-bold px-6 py-3 uppercase tracking-widest hover:bg-gray-800 transition-colors rounded-xl shadow-sm"
-                >
-                  Explore Catalog
-                </button>
-              </div>
-            ) : (
-              <>
-                {/* Items List */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+            <div className="flex-1 overflow-y-auto p-4">
+              {step === 'cart' && (
+                <div className="space-y-4">
                   {cart.map(item => (
-                    <div key={item.product.id} className="flex gap-3 border-b border-gray-100 pb-3">
-                      <img
-                        src={item.product.image}
-                        alt={item.product.name}
-                        className="w-16 h-20 object-cover bg-gray-100 rounded-xl flex-shrink-0 border border-gray-200 shadow-xs"
-                      />
-                      <div className="flex-1 flex flex-col justify-between">
-                        <div>
-                          <div className="flex justify-between items-start">
-                            <h4 className="text-sm font-bold text-gray-900 line-clamp-1">{item.product.name}</h4>
-                            <button
-                              onClick={() => removeFromCart(item.product.id)}
-                              className="text-gray-400 hover:text-red-500 transition-colors p-1"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <p className="text-sm font-extrabold text-gray-900 mt-0.5">₹{item.product.price}</p>
-                        </div>
-
-                        {/* Quantity */}
-                        <div className="flex items-center space-x-2 border border-gray-200 w-max px-1.5 py-0.5 mt-1.5 rounded-lg bg-gray-50">
-                          <button
-                            onClick={() => updateCartQuantity(item.product.id, item.quantity - 1)}
-                            className="p-1 hover:bg-gray-200 text-gray-700 rounded"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="text-xs font-bold px-2">{item.quantity}</span>
-                          <button
-                            onClick={() => updateCartQuantity(item.product.id, item.quantity + 1)}
-                            className="p-1 hover:bg-gray-200 text-gray-700 rounded"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
+                    <div key={item.product.id} className="flex gap-4 p-2 border-b">
+                      <img src={item.product.image} className="w-16 h-16 object-cover rounded-lg" />
+                      <div className="flex-1">
+                        <h4 className="font-bold">{item.product.name}</h4>
+                        <p>₹{item.product.price} x {item.quantity}</p>
                       </div>
+                      <button onClick={() => removeFromCart(item.product.id)}><Trash2 className="w-4 h-4 text-red-500" /></button>
                     </div>
                   ))}
-                </div>
-
-                {/* Campus Delivery Address & Customer Details */}
-                <div className="p-4 sm:p-5 border-t border-gray-200 bg-gray-50/70 space-y-3">
-                  <div className="bg-white p-3.5 border border-gray-200 rounded-2xl space-y-2.5 shadow-xs">
-                    <p className="text-[11px] font-bold tracking-wider text-slate-800 uppercase flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-brand-600" />
-                      Next-Day Campus Delivery Details:
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        placeholder="Your Name"
-                        value={user?.name || name}
-                        onChange={e => setName(e.target.value)}
-                        disabled={Boolean(user?.name)}
-                        className="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 font-medium"
-                      />
-                      <input
-                        type="tel"
-                        placeholder="10-digit Phone"
-                        value={user?.phone || phone}
-                        onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        disabled={Boolean(user?.phone)}
-                        className="w-full text-xs border border-gray-300 rounded-xl p-2.5 focus:outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 font-medium"
-                      />
-                    </div>
-
-                    <input
-                      type="text"
-                      placeholder="Building Name & Room No (e.g. Block B, Room 304 / Dept)"
-                      value={campusLocation}
-                      onChange={e => setCampusLocation(e.target.value)}
-                      className="w-full text-xs border border-brand-300 bg-brand-50/30 rounded-xl p-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 font-semibold text-slate-900"
-                      required
-                    />
-                  </div>
-
-                  {error && (
-                    <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200 font-medium">{error}</p>
-                  )}
-
-                  <div className="flex justify-between items-center text-sm font-bold text-gray-900 pt-1">
-                    <span>Total Amount:</span>
-                    <span className="text-xl font-black">₹{totalAmount}</span>
-                  </div>
-
-                  <button
-                    onClick={handlePlaceOrder}
-                    className="w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
-                  >
-                    <span>Request Order & Check Availability</span>
-                    <ArrowRight className="w-4 h-4" />
+                  <button onClick={proceedToDetails} className="w-full bg-black text-white p-3 rounded-lg font-bold flex justify-between">
+                    <span>Continue to Details</span> <ArrowRight />
                   </button>
                 </div>
-              </>
-            )}
+              )}
+
+              {step === 'details' && (
+                <div className="space-y-4">
+                  <input type="text" placeholder="Name" value={name} onChange={e => setName(e.target.value)} className="w-full p-3 border rounded-lg" />
+                  <input type="tel" placeholder="Phone" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-3 border rounded-lg" />
+                  <input type="text" placeholder="Campus Location (Hostel/Room)" value={campusLocation} onChange={e => setCampusLocation(e.target.value)} className="w-full p-3 border rounded-lg" />
+                  <button onClick={proceedToPayment} className="w-full bg-black text-white p-3 rounded-lg font-bold">Proceed to Payment</button>
+                </div>
+              )}
+
+              {step === 'payment' && (
+                <div className="space-y-4 text-center">
+                  <div className="bg-gray-100 p-4 rounded-lg">
+                    <p className="text-sm">Pay Advance Amount</p>
+                    <h3 className="text-3xl font-black">₹{advanceAmount}</h3>
+                  </div>
+                  <div className="flex items-center justify-center gap-2 p-2 bg-gray-50 rounded-lg cursor-pointer" onClick={handleCopyUpi}>
+                    <span className="font-mono text-sm">{storeSettings.upiId}</span>
+                    {copiedUpi ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                  </div>
+                  <div className="border-2 border-dashed p-6 rounded-lg">
+                    <input type="file" accept="image/*" onChange={handleFileUpload} className="hidden" id="proof" />
+                    <label htmlFor="proof" className="cursor-pointer flex flex-col items-center gap-2">
+                      {screenshotPreview ? <img src={screenshotPreview} className="h-32" /> : <UploadCloud className="w-10 h-10" />}
+                      <span className="text-sm text-gray-500">Upload payment screenshot</span>
+                    </label>
+                  </div>
+                  <button onClick={handleCompleteOrder} className="w-full bg-green-600 text-white p-3 rounded-lg font-bold">Confirm Order</button>
+                </div>
+              )}
+
+              {step === 'success' && (
+                <div className="flex flex-col items-center justify-center h-full gap-4">
+                  <CheckCircle className="w-16 h-16 text-green-500" />
+                  <h2 className="text-2xl font-bold">Order Received!</h2>
+                </div>
+              )}
+            </div>
+            {error && <p className="text-red-500 text-xs p-4 bg-red-50">{error}</p>}
           </motion.div>
         </>
       )}
