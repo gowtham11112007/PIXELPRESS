@@ -1,0 +1,10 @@
+{
+  "name": "pixelpress-monorepo",
+  "version": "1.0.0",
+  "scripts": {
+    "vercel-build": "echo 'Please set the Vercel Root Directory to CUSTOMER or SELLER in Vercel settings.'",
+    "install": "cd CUSTOMER && npm install && cd ../SELLER && npm install",
+    "build:customer": "cd CUSTOMER && npm run build",
+    "build:seller": "cd SELLER && npm run build"
+  }
+}
