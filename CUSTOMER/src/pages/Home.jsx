@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, Zap, Pin, ArrowRight, Star, ShieldCheck } from 'lucide-react';
+import { Search, Sparkles, Zap, Pin, ArrowRight, Star, ShieldCheck, Image as ImageIcon, CreditCard } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import ProductCard from '../components/ProductCard';
 import OrderModal from '../components/OrderModal';
@@ -8,7 +8,7 @@ import { useAppContext } from '../context/AppContext';
 
 // Scrolling promo bar below hero
 function PromoBar({ text }) {
-  const defaultText = "⚡ ORDER TODAY, GET IT DELIVERED TOMORROW ✦ 100% ULTRA-HD 300+ DPI PRINTS ✦ PREMIUM MATTE & GLOSS FINISH ✦ FREE FAST DELIVERY";
+  const defaultText = "Order today, delivered tomorrow • Premium quality prints";
   const displayText = (text || defaultText) + "      ";
   return (
     <div className="bg-slate-950 text-amber-400 text-[11px] tracking-widest font-black overflow-hidden py-2.5 border-y border-slate-800">
@@ -95,7 +95,7 @@ export default function Home() {
               className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-400/20 to-orange-500/20 border border-amber-400/40 text-amber-300 text-xs font-black px-3.5 py-1.5 rounded-full uppercase tracking-wider mb-5 backdrop-blur-md shadow-inner"
             >
               <Zap className="w-3.5 h-3.5 fill-amber-400 text-amber-400 animate-pulse" />
-              <span>⚡ Express 24-Hour Delivery • 300+ DPI Studio Quality</span>
+              <span>Express 24-Hour Delivery • 300+ DPI Studio Quality</span>
             </motion.div>
 
             <motion.h1 
@@ -353,13 +353,13 @@ export default function Home() {
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8 text-center">
               {[
-                { icon: "⚡", title: "Lightning Delivery", sub: "Dispatched in 24h to your doorstep" },
-                { icon: "💎", title: "300+ DPI Ultra-HD", sub: "Rich colors & fade-proof finish" },
-                { icon: "🎨", title: "Custom Prints", sub: "Print your own photos & art" },
-                { icon: "💵", title: "Easy Advance + COD", sub: "Pay balance upon delivery" },
+                { icon: <Zap className="w-6 h-6" />, title: "Fast Delivery", sub: "Dispatched in 24h to your doorstep" },
+                { icon: <Sparkles className="w-6 h-6" />, title: "300+ DPI Ultra-HD", sub: "Rich colors & fade-proof finish" },
+                { icon: <ImageIcon className="w-6 h-6" />, title: "Custom Prints", sub: "Print your own photos & art" },
+                { icon: <CreditCard className="w-6 h-6" />, title: "Easy Advance + COD", sub: "Pay balance upon delivery" },
               ].map((item) => (
                 <div key={item.title} className="flex flex-col items-center gap-2">
-                  <span className="text-2xl bg-white/10 p-3 rounded-2xl mb-1">{item.icon}</span>
+                  <span className="bg-white/10 p-3 rounded-2xl mb-1">{item.icon}</span>
                   <p className="text-xs sm:text-sm font-bold tracking-wide uppercase">{item.title}</p>
                   <p className="text-[11px] text-slate-400">{item.sub}</p>
                 </div>

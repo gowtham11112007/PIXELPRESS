@@ -175,7 +175,7 @@ export default function CartDrawer() {
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: '100%', opacity: 0 }}
               transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-              className="w-full h-full bg-white shadow-2xl pointer-events-auto flex flex-col"
+              className="w-full h-[100dvh] bg-white shadow-2xl pointer-events-auto flex flex-col"
             >
               {/* SUCCESS */}
               {step === 'success' && (
@@ -245,7 +245,7 @@ export default function CartDrawer() {
                           <p className="font-semibold text-lg">Your cart is empty</p>
                           <button
                             onClick={() => setIsCartOpen(false)}
-                            className="btn-secondary py-2 px-6"
+                            className="bg-black hover:bg-gray-800 text-white py-2 px-6 rounded-lg text-sm font-bold uppercase tracking-widest transition-colors"
                           >
                             Continue Shopping
                           </button>
@@ -460,7 +460,7 @@ export default function CartDrawer() {
                           type="button"
                           onClick={handleConfirmOrder}
                           disabled={isSubmitting || !screenshotPreview}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
+                          className="w-full bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
                         >
                           {isSubmitting ? (
                             <>

@@ -12,7 +12,7 @@ const DEFAULT_STORE_SETTINGS = {
   defaultAdvancePercent: 20,
   minAdvanceAmount: 100,
   storeName: 'PixelPress Campus',
-  announcementText: '⚡ LIGHTNING FAST 24-HOUR DELIVERY ✦ 300+ DPI ULTRA-HD PRINTS ✦ PREMIUM QUALITY GUARANTEED ✦ FREE FAST DELIVERY',
+  announcementText: 'Fast 24-hour delivery • Premium quality prints',
   cutoffTime: '21:00', // 9 PM cutoff for next-day delivery
   campusLocations: ['Block A', 'Block B', 'Block C', 'Building 1', 'Building 2', 'Mechanical Dept', 'CSE Dept', 'Main Canteen Pickup']
 };

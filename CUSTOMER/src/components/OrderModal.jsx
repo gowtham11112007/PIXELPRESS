@@ -169,7 +169,7 @@ export default function OrderModal({ product, isOpen, onClose }) {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', bounce: 0, duration: 0.38 }}
-              className="w-full sm:max-w-xl bg-white rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl pointer-events-auto max-h-[92vh] flex flex-col"
+              className="w-full sm:max-w-xl bg-white rounded-t-2xl sm:rounded-2xl overflow-hidden shadow-2xl pointer-events-auto max-h-[92dvh] flex flex-col"
             >
               {/* SUCCESS */}
               {step === 'success' && (
@@ -410,7 +410,7 @@ export default function OrderModal({ product, isOpen, onClose }) {
                           type="button"
                           onClick={handleConfirmOrder}
                           disabled={isSubmitting || !screenshotPreview}
-                          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
+                          className="w-full bg-black hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-bold py-3.5 uppercase tracking-widest flex items-center justify-center space-x-2 transition-colors rounded-xl shadow-md"
                         >
                           {isSubmitting ? (
                             <>

@@ -216,7 +216,7 @@ export default function OrderCard({ order }) {
             {(normalizedStatus === 'Pending' || normalizedStatus === 'Accepted') && !order.paymentScreenshotUrl && !showPaymentUI && (
               <button 
                 onClick={() => setShowPaymentUI(true)}
-                className="mt-3 w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 uppercase tracking-widest rounded-xl shadow-md transition-colors"
+                className="mt-3 w-full bg-black hover:bg-gray-800 text-white text-xs font-bold py-2.5 uppercase tracking-widest rounded-xl shadow-md transition-colors"
               >
                 Upload Payment Proof
               </button>
@@ -248,7 +248,7 @@ export default function OrderCard({ order }) {
                 <button 
                   onClick={submitPaymentProof}
                   disabled={isUploading || !screenshotPreview}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 transition-colors text-white text-xs font-bold py-2 rounded-lg disabled:opacity-50"
+                  className="w-full bg-black hover:bg-gray-800 transition-colors text-white text-xs font-bold py-2 rounded-lg disabled:opacity-50"
                 >
                   {isUploading ? 'Uploading...' : 'Submit Proof'}
                 </button>
@@ -277,7 +277,7 @@ export default function OrderCard({ order }) {
           </div>
 
           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-[11px] text-slate-500">⚡ Next-Day Campus Delivery</span>
+            <span className="text-[11px] text-slate-500">Next-Day Campus Delivery</span>
             <button
               onClick={handleWhatsApp}
               className="inline-flex items-center gap-1 bg-[#25D366] hover:bg-[#20bb5a] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors shadow-xs"

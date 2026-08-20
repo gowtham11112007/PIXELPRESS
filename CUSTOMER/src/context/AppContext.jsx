@@ -10,7 +10,7 @@ const DEFAULT_STORE_SETTINGS = {
   defaultAdvancePercent: 20,
   minAdvanceAmount: 100,
   storeName: 'PixelPress Campus',
-  announcementText: '⚡ LIGHTNING FAST 24-HOUR DELIVERY ✦ 300+ DPI ULTRA-HD PRINTS ✦ PREMIUM QUALITY GUARANTEED ✦ FREE FAST DELIVERY',
+  announcementText: 'Fast 24-hour delivery • Premium quality prints',
   isTemporarilyClosed: false,
   closedReason: 'Temporarily closed for maintenance.'
 };
@@ -58,7 +58,7 @@ function normalizeCustomerOrder(o) {
     date: o.created_at || o.date || o.timestamp || new Date().toISOString(),
     timestamp: o.created_at || o.date || o.timestamp || new Date().toISOString(),
     campusLocation: o.campusLocation || parsedNotes.campusLocation || parsedNotes.locationOrDept || 'Campus Delivery',
-    deliverySlot: o.deliverySlot || parsedNotes.deliverySlot || '⚡ Next-Day Campus Delivery',
+    deliverySlot: o.deliverySlot || parsedNotes.deliverySlot || 'Next-Day Campus Delivery',
     notes: o.notes,
     paymentScreenshotUrl: o.paymentScreenshotUrl || parsedNotes.paymentScreenshotUrl || o.payment_screenshot_url || null,
     advanceAmount: o.advanceAmount ?? parsedNotes.advanceAmount ?? null,
@@ -697,7 +697,7 @@ export function AppProvider({ children }) {
       paymentScreenshotUrl,
       advanceAmount,
       campusLocation: campusLocation || 'Campus Delivery',
-      deliverySlot: '⚡ Next-Day Campus Delivery',
+      deliverySlot: 'Next-Day Campus Delivery',
       upiId: storeSettings.upiId,
       customerNote: notes
     });
@@ -831,7 +831,7 @@ export function AppProvider({ children }) {
         products,
         collections,
         isProductsLoading,
-        orders,
+        orders: orders.filter(o => !hiddenOrderIds.includes(o.id)),
         cart,
         isCartOpen,
         setIsCartOpen,
@@ -844,7 +844,7 @@ export function AppProvider({ children }) {
         checkoutCart,
         clearOrders,
         fetchProducts,
-        fetchOrders,
+        fetchOrders, hideOrder, clearOrderHistory,
         isSupabaseConfigured,
         supabase,
         supabaseUser,
