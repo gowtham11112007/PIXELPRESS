@@ -130,6 +130,34 @@ export function AppProvider({ children }) {
     }
   });
 
+  const [hiddenOrderIds, setHiddenOrderIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pixelpress_hidden_orders');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pixelpress_hidden_orders', JSON.stringify(hiddenOrderIds));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [hiddenOrderIds]);
+
+  const hideOrder = useCallback((id) => {
+    setHiddenOrderIds(prev => {
+      if (prev.includes(id)) return prev;
+      return [...prev, id];
+    });
+  }, []);
+
+  const clearOrderHistory = useCallback(() => {
+    setHiddenOrderIds(orders.map(o => o.id));
+  }, [orders]);
+
   // 3. Persistent Cart State
   const [cart, setCart] = useState(() => {
     try {
