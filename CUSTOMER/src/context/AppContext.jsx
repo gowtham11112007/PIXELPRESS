@@ -87,16 +87,19 @@ export function AppProvider({ children }) {
   const [products, setProducts] = useState(() => {
     try {
       const saved = localStorage.getItem('pixelpress_products');
-      return saved ? JSON.parse(saved) : mockProducts;
+      const parsed = saved ? JSON.parse(saved) : mockProducts;
+      return Array.isArray(parsed) ? parsed : mockProducts;
     } catch {
       return mockProducts;
     }
   });
 
+  // 1. Collections State
   const [collections, setCollections] = useState(() => {
     try {
       const saved = localStorage.getItem('pixelpress_collections');
-      return saved ? JSON.parse(saved) : DEFAULT_COLLECTIONS;
+      const parsed = saved ? JSON.parse(saved) : DEFAULT_COLLECTIONS;
+      return Array.isArray(parsed) ? parsed : DEFAULT_COLLECTIONS;
     } catch {
       return DEFAULT_COLLECTIONS;
     }
