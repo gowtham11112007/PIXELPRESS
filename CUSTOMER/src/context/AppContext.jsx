@@ -131,7 +131,8 @@ export function AppProvider({ children }) {
     try {
       const cartKey = user?.phone ? `pixelpress_cart_${user.phone}` : 'pixelpress_cart_guest';
       const savedCart = localStorage.getItem(cartKey);
-      return savedCart ? JSON.parse(savedCart) : [];
+      const parsed = savedCart ? JSON.parse(savedCart) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -581,20 +582,23 @@ export function AppProvider({ children }) {
       
       let mergedCart = [];
       if (savedUserCart) {
-        mergedCart = JSON.parse(savedUserCart);
+        const parsed = JSON.parse(savedUserCart);
+        if (Array.isArray(parsed)) mergedCart = parsed;
       }
       
       if (guestCartString) {
         try {
           const guestCart = JSON.parse(guestCartString);
-          guestCart.forEach(gItem => {
-            const existing = mergedCart.find(mItem => mItem.product.id === gItem.product.id);
-            if (existing) {
-               existing.quantity = Math.min(10, existing.quantity + gItem.quantity);
-            } else {
-               mergedCart.push(gItem);
-            }
-          });
+          if (Array.isArray(guestCart)) {
+            guestCart.forEach(gItem => {
+              const existing = mergedCart.find(mItem => mItem.product?.id === gItem.product?.id);
+              if (existing) {
+                 existing.quantity = Math.min(10, existing.quantity + gItem.quantity);
+              } else {
+                 mergedCart.push(gItem);
+              }
+            });
+          }
           localStorage.removeItem('pixelpress_cart_guest');
         } catch(e){}
       }

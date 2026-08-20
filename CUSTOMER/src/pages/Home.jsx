@@ -43,7 +43,7 @@ export default function Home() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = (p.name || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = activeCategory === "All" || p.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
