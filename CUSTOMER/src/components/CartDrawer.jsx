@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, CheckCircle, MapPin, Zap } from 'lucide-react';
+import {
+  X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, ArrowLeft,
+  CheckCircle, MapPin, Zap, Copy, Check, UploadCloud, QrCode
+} from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 import { compressImage } from '../lib/imageUtils';
 
 export default function CartDrawer() {
