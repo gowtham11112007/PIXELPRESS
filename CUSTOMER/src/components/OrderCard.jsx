@@ -19,7 +19,7 @@ export default function OrderCard({ order }) {
     'Pending Payment Review':  { label: 'Payment Under Review', icon: Clock, cls: 'text-amber-700 bg-amber-50 border-amber-300 font-bold animate-pulse' },
     'Payment Review':  { label: 'Payment Under Review', icon: Clock, cls: 'text-amber-700 bg-amber-50 border-amber-300 font-bold animate-pulse' },
     'Printing': { label: 'Confirmed & Printing', icon: Printer, cls: 'text-blue-700 bg-blue-50 border-blue-200 font-bold' },
-    'Accepted': { label: 'Waiting for Payment', icon: Clock, cls: 'text-amber-600 bg-amber-50 border-amber-200 font-bold animate-pulse' },
+    'Accepted': { label: 'Confirmed & Awaiting Delivery', icon: CheckCircle2, cls: 'text-emerald-600 bg-emerald-50 border-emerald-200 font-bold' },
     'Out for Delivery': { label: 'Out for Campus Delivery', icon: Truck, cls: 'text-purple-700 bg-purple-50 border-purple-200 font-bold' },
     'Delivered': { label: 'Delivered to Room', icon: CheckCircle2, cls: 'text-emerald-700 bg-emerald-50 border-emerald-200 font-bold' },
     'Rejected': { label: 'Rejected', icon: XCircle, cls: 'text-red-600 bg-red-50 border-red-200' },
@@ -31,12 +31,12 @@ export default function OrderCard({ order }) {
   });
 
   const total = order.totalAmount || (order.product?.price * order.quantity) || 0;
-  const advance = order.advanceAmount || Math.round(total * 0.2);
+  const advance = order.advanceAmount ?? Math.round(total * 0.2);
   const balance = Math.max(0, total - advance);
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
-      `Hi PixelPress! I'd like to check on my campus order #${order.id.slice(0, 8).toUpperCase()} for "${order.product?.name}" (Location: ${order.campusLocation || 'Location'}). Balance to pay: ₹${balance}.`
+      `Hi PixelPress! I'd like to check on my campus order #${(order.id || '').slice(0, 8).toUpperCase()} for "${order.product?.name}" (Location: ${order.campusLocation || 'Location'}). Balance to pay: ₹${balance}.`
     );
     window.open(`https://wa.me/919047302794?text=${text}`, '_blank');
   };
@@ -192,12 +192,13 @@ export default function OrderCard({ order }) {
               </div>
             )}
             
-            {order.status === 'Accepted' && !showPaymentUI && (
+            {/* Payment proof re-upload (emergency fallback if screenshot was missing) */}
+            {(order.status === 'Pending' || order.status === 'Accepted') && !order.paymentScreenshotUrl && !showPaymentUI && (
               <button 
                 onClick={() => setShowPaymentUI(true)}
-                className="mt-3 w-full bg-slate-900 hover:bg-black text-white text-xs font-bold py-2.5 uppercase tracking-widest rounded-xl shadow-md transition-colors"
+                className="mt-3 w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 uppercase tracking-widest rounded-xl shadow-md transition-colors"
               >
-                Pay Advance (₹{advance}) & Confirm
+                Upload Payment Proof
               </button>
             )}
             

@@ -208,7 +208,9 @@ export const SellerProvider = ({ children }) => {
             defaultAdvancePercent: s.original_price || DEFAULT_STORE_SETTINGS.defaultAdvancePercent,
             minAdvanceAmount: s.price || DEFAULT_STORE_SETTINGS.minAdvanceAmount,
             storeName: s.name || DEFAULT_STORE_SETTINGS.storeName,
-            announcementText: p.name || DEFAULT_STORE_SETTINGS.announcementText
+            announcementText: p.name || DEFAULT_STORE_SETTINGS.announcementText,
+            isTemporarilyClosed: s.is_pinned !== undefined ? Boolean(s.is_pinned) : false,
+            closedReason: p.description || 'Temporarily closed for maintenance.'
           }));
         }
 
@@ -259,11 +261,13 @@ export const SellerProvider = ({ children }) => {
           image_url: merged.upiQrUrl || '',
           original_price: Number(merged.defaultAdvancePercent) || 20,
           price: Number(merged.minAdvanceAmount) || 100,
+          is_pinned: merged.isTemporarilyClosed ? true : false,
           is_active: false
         };
 
         const promoPayload = {
           name: merged.announcementText || DEFAULT_STORE_SETTINGS.announcementText,
+          description: merged.closedReason || 'Temporarily closed for maintenance.',
           category: '__PROMO_SETTINGS__',
           price: 0,
           is_active: false
@@ -427,6 +431,7 @@ export const SellerProvider = ({ children }) => {
         .from('products')
         .select('*')
         .neq('category', '__STORE_SETTINGS__')
+        .neq('category', '__PROMO_SETTINGS__')
         .neq('category', '__COLLECTION__')
         .order('created_at', { ascending: false });
 
@@ -560,7 +565,7 @@ export const SellerProvider = ({ children }) => {
       fetchProducts();
       fetchOrders();
       fetchStoreSettings();
-    }, 15000);
+    }, 30000);
 
     return () => {
       supabase.removeChannel(orderChannel);
@@ -570,7 +575,7 @@ export const SellerProvider = ({ children }) => {
   }, [fetchProducts, fetchOrders, fetchStoreSettings]);
 
   const login = (name, phone) => setUser({ name, phone });
-  const logout = () => setUser(null);
+  const logout = () => setUser({ name: 'Campus Admin', phone: '+91 9876543210' });
 
   // Add Product
   const addProduct = async (product) => {

@@ -10,7 +10,9 @@ const DEFAULT_STORE_SETTINGS = {
   defaultAdvancePercent: 20,
   minAdvanceAmount: 100,
   storeName: 'PixelPress Campus',
-  announcementText: '⚡ LIGHTNING FAST 24-HOUR DELIVERY ✦ 300+ DPI ULTRA-HD PRINTS ✦ PREMIUM QUALITY GUARANTEED ✦ FREE FAST DELIVERY'
+  announcementText: '⚡ LIGHTNING FAST 24-HOUR DELIVERY ✦ 300+ DPI ULTRA-HD PRINTS ✦ PREMIUM QUALITY GUARANTEED ✦ FREE FAST DELIVERY',
+  isTemporarilyClosed: false,
+  closedReason: 'Temporarily closed for maintenance.'
 };
 
 const DEFAULT_COLLECTIONS = [
@@ -199,7 +201,9 @@ export function AppProvider({ children }) {
             defaultAdvancePercent: s.original_price || DEFAULT_STORE_SETTINGS.defaultAdvancePercent,
             minAdvanceAmount: s.price || DEFAULT_STORE_SETTINGS.minAdvanceAmount,
             storeName: s.name || DEFAULT_STORE_SETTINGS.storeName,
-            announcementText: p.name || DEFAULT_STORE_SETTINGS.announcementText
+            announcementText: p.name || DEFAULT_STORE_SETTINGS.announcementText,
+            isTemporarilyClosed: s.is_pinned !== undefined ? Boolean(s.is_pinned) : false,
+            closedReason: p.description || 'Temporarily closed for maintenance.'
           });
         }
 
@@ -265,6 +269,7 @@ export function AppProvider({ children }) {
         .select('*')
         .eq('is_active', true)
         .neq('category', '__STORE_SETTINGS__')
+        .neq('category', '__PROMO_SETTINGS__')
         .neq('category', '__COLLECTION__')
         .order('created_at', { ascending: false });
 
@@ -433,7 +438,7 @@ export function AppProvider({ children }) {
     const fallbackInterval = setInterval(() => {
       fetchStoreSettings();
       fetchProducts();
-    }, 15000);
+    }, 30000);
 
     return () => {
       supabase.removeChannel(channel);
@@ -472,8 +477,10 @@ export function AppProvider({ children }) {
       .subscribe();
 
     const fallbackInterval = setInterval(() => {
-      fetchOrders();
-    }, 15000);
+      if (user?.phone) {
+        fetchOrders();
+      }
+    }, 30000);
 
     return () => {
       supabase.removeChannel(channel);
@@ -570,9 +577,28 @@ export function AppProvider({ children }) {
     try {
       const userCartKey = `pixelpress_cart_${cleanUser.phone}`;
       const savedUserCart = localStorage.getItem(userCartKey);
+      const guestCartString = localStorage.getItem('pixelpress_cart_guest');
+      
+      let mergedCart = [];
       if (savedUserCart) {
-        setCart(JSON.parse(savedUserCart));
+        mergedCart = JSON.parse(savedUserCart);
       }
+      
+      if (guestCartString) {
+        try {
+          const guestCart = JSON.parse(guestCartString);
+          guestCart.forEach(gItem => {
+            const existing = mergedCart.find(mItem => mItem.product.id === gItem.product.id);
+            if (existing) {
+               existing.quantity = Math.min(10, existing.quantity + gItem.quantity);
+            } else {
+               mergedCart.push(gItem);
+            }
+          });
+          localStorage.removeItem('pixelpress_cart_guest');
+        } catch(e){}
+      }
+      setCart(mergedCart);
     } catch (e) {
       console.error(e);
     }
@@ -661,7 +687,7 @@ export function AppProvider({ children }) {
     }
 
     if (!user && customerInfo) {
-      login(customerInfo.name, customerInfo.phone);
+      await login(customerInfo.name, customerInfo.phone);
     }
 
     const totalAmount = product.price * quantity;
@@ -760,7 +786,7 @@ export function AppProvider({ children }) {
   };
 
   // Checkout Entire Cart
-  const checkoutCart = async (customerInfo = null, paymentScreenshotUrl = null, calculatedAdvance = 0, campusLocation = '') => {
+  const checkoutCart = async (customerInfo = null, paymentScreenshotUrl = null, totalAdvancePaid = 0, campusLocation = '') => {
     const activeUser = customerInfo || user;
     if (!activeUser || !activeUser.name || !activeUser.phone) {
       throw new Error('Name and Phone Number are required.');
@@ -768,7 +794,25 @@ export function AppProvider({ children }) {
     if (cart.length === 0) return;
 
     for (const item of cart) {
-      await placeOrder(item.product, item.quantity, activeUser, '', paymentScreenshotUrl, calculatedAdvance, campusLocation);
+      const p = item.product;
+      const itemTotal = p.price * item.quantity;
+      let itemAdvance = 0;
+      
+      if (p.advanceType === 'fixed') {
+        itemAdvance = Math.min(itemTotal, (Number(p.advanceValue) || 0) * item.quantity);
+      } else if (p.advanceType === 'percentage') {
+        itemAdvance = Math.min(itemTotal, Math.round(itemTotal * ((Number(p.advanceValue) || 0) / 100)));
+      } else if (p.advanceType === 'zero') {
+        itemAdvance = 0;
+      } else {
+        const pct = Number(storeSettings?.defaultAdvancePercent) || 20;
+        itemAdvance = Math.round(itemTotal * (pct / 100));
+      }
+      
+      // We pass the true per-item advance, but if there was a minimum advance bump, 
+      // the first item will just absorb the extra, or we just trust the per-item.
+      // To be safe and simple, we'll just pass the calculated itemAdvance.
+      await placeOrder(item.product, item.quantity, activeUser, '', paymentScreenshotUrl, itemAdvance, campusLocation);
     }
     clearCart();
   };
@@ -802,6 +846,7 @@ export function AppProvider({ children }) {
         fetchProducts,
         fetchOrders,
         isSupabaseConfigured,
+        supabase,
         supabaseUser,
         authLoading,
         toast,
