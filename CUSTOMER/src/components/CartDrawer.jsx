@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Minus, Plus, ShoppingCart, ArrowRight, ArrowLeft, MapPin, Copy, UploadCloud, QrCode, CheckCircle, Trash2 } from "lucide-react";
+import { X, Minus, Plus, ShoppingCart, ArrowRight, ArrowLeft, MapPin, Copy, UploadCloud, QrCode, Check, CheckCircle, Trash2 } from "lucide-react";
 import { useAppContext } from "../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { compressImage } from "../lib/imageUtils";
