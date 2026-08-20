@@ -9,10 +9,14 @@ export default function OrderCard({ order }) {
   const [screenshotFile, setScreenshotFile] = useState(null);
   const [screenshotPreview, setScreenshotPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const isAccepted = order.status === 'Accepted' || order.status === 'Printing';
-  const isOutForDelivery = order.status === 'Out for Delivery';
-  const isDelivered = order.status === 'Delivered';
-  const isRejected = order.status === 'Rejected';
+  let normalizedStatus = order.status;
+  if (normalizedStatus === 'Pending Payment') normalizedStatus = 'Pending';
+  if (normalizedStatus === 'Order Confirmed') normalizedStatus = 'Accepted';
+
+  const isAccepted = normalizedStatus === 'Accepted' || normalizedStatus === 'Printing';
+  const isOutForDelivery = normalizedStatus === 'Out for Delivery';
+  const isDelivered = normalizedStatus === 'Delivered';
+  const isRejected = normalizedStatus === 'Rejected';
 
   const statusConfig = {
     'Pending':  { label: 'Awaiting Confirmation',  icon: Clock, cls: 'text-slate-600 bg-slate-50 border-slate-200' },
@@ -24,7 +28,7 @@ export default function OrderCard({ order }) {
     'Delivered': { label: 'Delivered to Room', icon: CheckCircle2, cls: 'text-emerald-700 bg-emerald-50 border-emerald-200 font-bold' },
     'Rejected': { label: 'Rejected', icon: XCircle, cls: 'text-red-600 bg-red-50 border-red-200' },
   };
-  const { label, icon: Icon, cls } = statusConfig[order.status] || statusConfig['Pending'];
+  const { label, icon: Icon, cls } = statusConfig[normalizedStatus] || statusConfig['Pending'];
 
   const orderDate = new Date(order.date).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'short', year: 'numeric',
@@ -43,10 +47,26 @@ export default function OrderCard({ order }) {
 
   // 4 Delivery Progress Steps
   const steps = [
-    { label: 'Review', done: true },
-    { label: 'Printing', done: isAccepted || isOutForDelivery || isDelivered },
-    { label: 'Dispatched', done: isOutForDelivery || isDelivered },
-    { label: 'Delivered', done: isDelivered },
+    { 
+      label: 'Review', 
+      done: isAccepted || isOutForDelivery || isDelivered,
+      active: normalizedStatus === 'Pending Payment Review' || normalizedStatus === 'Payment Review' || normalizedStatus === 'Pending'
+    },
+    { 
+      label: 'Printing', 
+      done: isOutForDelivery || isDelivered,
+      active: normalizedStatus === 'Printing' || normalizedStatus === 'Accepted'
+    },
+    { 
+      label: 'Dispatched', 
+      done: isDelivered,
+      active: isOutForDelivery
+    },
+    { 
+      label: 'Delivered', 
+      done: isDelivered,
+      active: isDelivered
+    },
   ];
 
   const handleImageChange = async (e) => {
@@ -176,8 +196,8 @@ export default function OrderCard({ order }) {
             {/* Advance & Balance Details */}
             <div className="mt-3 flex gap-3 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
               <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-semibold">{order.status === 'Pending' || order.status === 'Accepted' ? 'Advance To Pay' : 'Advance Paid'}</span>
-                <span className={`font-bold ${order.status === 'Pending' || order.status === 'Accepted' ? 'text-amber-600' : 'text-emerald-700'}`}>₹{advance}</span>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">{normalizedStatus === 'Pending' || normalizedStatus === 'Accepted' ? 'Advance To Pay' : 'Advance Paid'}</span>
+                <span className={`font-bold ${normalizedStatus === 'Pending' || normalizedStatus === 'Accepted' ? 'text-amber-600' : 'text-emerald-700'}`}>₹{advance}</span>
               </div>
               <div className="border-l border-slate-200 pl-3">
                 <span className="text-slate-400 block text-[10px] uppercase font-semibold">Pay on Delivery (COD)</span>
@@ -193,7 +213,7 @@ export default function OrderCard({ order }) {
             )}
             
             {/* Payment proof re-upload (emergency fallback if screenshot was missing) */}
-            {(order.status === 'Pending' || order.status === 'Accepted') && !order.paymentScreenshotUrl && !showPaymentUI && (
+            {(normalizedStatus === 'Pending' || normalizedStatus === 'Accepted') && !order.paymentScreenshotUrl && !showPaymentUI && (
               <button 
                 onClick={() => setShowPaymentUI(true)}
                 className="mt-3 w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold py-2.5 uppercase tracking-widest rounded-xl shadow-md transition-colors"
@@ -242,10 +262,10 @@ export default function OrderCard({ order }) {
                   {steps.map((s) => (
                     <div key={s.label} className="flex flex-col items-center">
                       <div className={`h-1.5 w-full rounded-full mb-1 transition-colors ${
-                        s.done ? 'bg-emerald-500' : 'bg-slate-200'
+                        s.done ? 'bg-emerald-500' : (s.active ? 'bg-amber-400 animate-pulse' : 'bg-slate-200')
                       }`} />
                       <span className={`text-[9px] font-bold ${
-                        s.done ? 'text-slate-900' : 'text-slate-400'
+                        s.done || s.active ? 'text-slate-900' : 'text-slate-400'
                       }`}>
                         {s.label}
                       </span>

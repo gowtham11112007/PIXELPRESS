@@ -200,7 +200,7 @@ export function AppProvider({ children }) {
             upiQrUrl: s.image_url || '',
             defaultAdvancePercent: s.original_price || DEFAULT_STORE_SETTINGS.defaultAdvancePercent,
             minAdvanceAmount: s.price || DEFAULT_STORE_SETTINGS.minAdvanceAmount,
-            storeName: s.name || DEFAULT_STORE_SETTINGS.storeName,
+            storeName: (s.name && s.name !== "__STORE_SETTINGS__" && s.name !== "PIXELPRESS Settings") ? s.name : DEFAULT_STORE_SETTINGS.storeName,
             announcementText: p.name || DEFAULT_STORE_SETTINGS.announcementText,
             isTemporarilyClosed: s.is_pinned !== undefined ? Boolean(s.is_pinned) : false,
             closedReason: p.description || 'Temporarily closed for maintenance.'
