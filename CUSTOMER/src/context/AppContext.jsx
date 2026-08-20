@@ -107,11 +107,12 @@ export function AppProvider({ children }) {
 
   const [isProductsLoading, setIsProductsLoading] = useState(true);
 
-  // Store Settings (Dynamic UPI ID, QR Code, Advance payment %)
+  // 3. Store Settings State
   const [storeSettings, setStoreSettings] = useState(() => {
     try {
       const saved = localStorage.getItem('pixelpress_store_settings');
-      return saved ? JSON.parse(saved) : DEFAULT_STORE_SETTINGS;
+      const parsed = saved ? JSON.parse(saved) : DEFAULT_STORE_SETTINGS;
+      return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : DEFAULT_STORE_SETTINGS;
     } catch {
       return DEFAULT_STORE_SETTINGS;
     }
