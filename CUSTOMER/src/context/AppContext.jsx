@@ -844,7 +844,7 @@ export function AppProvider({ children }) {
         checkoutCart,
         clearOrders,
         fetchProducts,
-        fetchOrders, hideOrder, clearOrderHistory,
+        fetchOrders,
         isSupabaseConfigured,
         supabase,
         supabaseUser,
